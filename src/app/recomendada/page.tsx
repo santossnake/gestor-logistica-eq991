@@ -8,12 +8,17 @@ import { MOCK_VIATURAS, MOCK_ANOMALIAS } from '@/lib/mock-data';
 import { NfcScanner } from '@/components/NfcScanner';
 
 export default function RecomendadaPage() {
-  const [viaturas, setViaturas] = useState<Viatura[]>([]);
-  const [anomalias, setAnomalias] = useState<Anomalia[]>([]);
-  const [recomendada, setRecomendada] = useState<Viatura | null>(null);
-  const [selectedViatura, setSelectedViatura] = useState<Viatura | null>(null);
+  // Synchronous calculation of top recommended vehicle on initial render
+  const initialFleet = MOCK_VIATURAS;
+  const initialAnomalies = MOCK_ANOMALIAS;
+  const initialForced = initialFleet.find((v) => v.is_forcada_recomendada && v.estado === 'DISPONIVEL');
+  const initialRec = initialForced || initialFleet.find((v) => v.estado === 'DISPONIVEL') || initialFleet[0];
+
+  const [viaturas, setViaturas] = useState<Viatura[]>(initialFleet);
+  const [anomalias, setAnomalias] = useState<Anomalia[]>(initialAnomalies);
+  const [recomendada, setRecomendada] = useState<Viatura | null>(initialRec);
+  const [selectedViatura, setSelectedViatura] = useState<Viatura | null>(initialRec);
   const [showNfcScanner, setShowNfcScanner] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     async function loadFleet() {
@@ -28,13 +33,11 @@ export default function RecomendadaPage() {
         setAnomalias(anomalies);
 
         // Intelligent Recommendation Logic:
-        // 1. Check if logistics forced a vehicle
         const forced = fleet.find((v) => v.is_forcada_recomendada && v.estado === 'DISPONIVEL');
         if (forced) {
           setRecomendada(forced);
           setSelectedViatura(forced);
         } else {
-          // 2. Filter available vehicles with no blocking severe anomalies and no urgent cleaning
           const available = fleet.filter((v) => {
             if (v.estado !== 'DISPONIVEL') return false;
             if (v.necessita_limpeza) return false;
@@ -47,38 +50,22 @@ export default function RecomendadaPage() {
             return true;
           });
 
-          // 3. Sort by lowest total odometer kilometers for fleet wear balancing
           if (available.length > 0) {
             available.sort((a, b) => a.km_atuais - b.km_atuais);
             setRecomendada(available[0]);
             setSelectedViatura(available[0]);
           } else if (fleet.length > 0) {
-            // Fallback to first vehicle if none strictly available
             setRecomendada(fleet[0]);
             setSelectedViatura(fleet[0]);
           }
         }
       } catch (err) {
-        console.error('Erro ao carregar frota:', err);
-        setViaturas(MOCK_VIATURAS);
-        setRecomendada(MOCK_VIATURAS[0]);
-        setSelectedViatura(MOCK_VIATURAS[0]);
-      } finally {
-        setLoading(false);
+        console.error('Carregamento assíncrono em segundo plano:', err);
       }
     }
 
     loadFleet();
   }, []);
-
-  if (loading) {
-    return (
-      <div className="py-16 text-center space-y-3">
-        <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-        <p className="text-xs text-slate-400 font-mono">A calcular viatura recomendada para a Esquadra 991...</p>
-      </div>
-    );
-  }
 
   const activeViatura = selectedViatura || recomendada;
 
@@ -201,7 +188,7 @@ export default function RecomendadaPage() {
         </div>
       )}
 
-      {/* Fleet Selection List (User can pick any available vehicle) */}
+      {/* Fleet Selection List */}
       <div className="space-y-4 pt-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
@@ -215,7 +202,6 @@ export default function RecomendadaPage() {
           {viaturas.map((v) => {
             const isSelected = activeViatura?.id === v.id;
             const isRec = recomendada?.id === v.id;
-            const isAvailable = v.estado === 'DISPONIVEL';
 
             return (
               <div
