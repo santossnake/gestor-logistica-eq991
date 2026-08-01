@@ -148,6 +148,13 @@ export default function RecomendadaPage() {
             </div>
           </div>
 
+          <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 text-xs text-slate-300 flex items-center space-x-2">
+            <Info className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>
+              O QR Code do painel e as Tags NFC no porta-chaves são atalhos diretos para aceder à viatura. Pode iniciar marcha diretamente aqui.
+            </span>
+          </div>
+
           {/* Details Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
             <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
@@ -166,28 +173,28 @@ export default function RecomendadaPage() {
             </div>
 
             <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
-              <span className="text-slate-500 block">LOCAL DA VIATURA</span>
+              <span className="text-slate-500 block">PARQUEAMENTO</span>
               <span className="text-slate-200 text-xs truncate block" title={activeViatura.localizacao_atual_viatura}>
                 {activeViatura.localizacao_atual_viatura}
               </span>
             </div>
 
             <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
-              <span className="text-slate-500 block">LOCAL DA CHAVE</span>
+              <span className="text-slate-500 block">LOCAL CHAVE</span>
               <span className="text-slate-200 text-xs truncate block" title={activeViatura.localizacao_atual_chave}>
                 {activeViatura.localizacao_atual_chave}
               </span>
             </div>
           </div>
 
-          {/* Action Button */}
+          {/* Direct Action Button */}
           <div className="pt-2">
             <Link
               href={`/chave/${activeViatura.qr_code_token}`}
               className="w-full py-4 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base tracking-wider uppercase shadow-xl shadow-emerald-950/80 flex items-center justify-center space-x-3 transition-all group"
             >
               <Car className="w-6 h-6" />
-              <span>Iniciar Marcha nesta Viatura</span>
+              <span>Abrir Página da Viatura & Iniciar Marcha</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
