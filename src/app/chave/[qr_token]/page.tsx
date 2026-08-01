@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import {
   Car,
   Key,
@@ -19,7 +20,9 @@ import {
   User,
   Shield,
   Briefcase,
-  AlertCircle
+  AlertCircle,
+  Navigation,
+  Info
 } from 'lucide-react';
 import { getStoredMilitaryProfile, saveMilitaryProfile, MilitaryProfile } from '@/lib/utils/cookies';
 import { supabase, Viatura, LocalItem, RegistoMarcha } from '@/lib/supabase/client';
@@ -27,30 +30,35 @@ import { MOCK_VIATURAS, MOCK_LOCAIS, MOCK_MARCHAS } from '@/lib/mock-data';
 import { LiveGpsTracker } from '@/components/LiveGpsTracker';
 import { OdometerScanner } from '@/components/OdometerScanner';
 
+const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
+
 export default function ChavePage() {
   const params = useParams();
   const router = useRouter();
   const qrToken = (params?.qr_token as string) || '';
 
-  const [viatura, setViatura] = useState<Viatura | null>(null);
-  const [locaisChave, setLocaisChave] = useState<LocalItem[]>([]);
-  const [locaisViatura, setLocaisViatura] = useState<LocalItem[]>([]);
+  // Synchronous initial vehicle lookup to eliminate waiting screen
+  const initialV = MOCK_VIATURAS.find((item) => item.qr_code_token === qrToken) || MOCK_VIATURAS[0];
+
+  const [viatura, setViatura] = useState<Viatura>(initialV);
+  const [locaisChave, setLocaisChave] = useState<LocalItem[]>(MOCK_LOCAIS.filter((l) => l.tipo === 'CHAVE'));
+  const [locaisViatura, setLocaisViatura] = useState<LocalItem[]>(MOCK_LOCAIS.filter((l) => l.tipo === 'VIATURA'));
   const [marchaAtiva, setMarchaAtiva] = useState<RegistoMarcha | null>(null);
 
   const [profile, setProfile] = useState<MilitaryProfile>({ nip: '', nome: '', posto: 'Tenente', email: '' });
   const [isGpsTrackingActive, setIsGpsTrackingActive] = useState<boolean>(false);
 
   // Form states for Início de Marcha
-  const [kmInicialInput, setKmInicialInput] = useState<number>(0);
+  const [kmInicialInput, setKmInicialInput] = useState<number>(initialV.km_atuais);
 
   // Form states for Finalizar Marcha
-  const [kmFinalInput, setKmFinalInput] = useState<number>(0);
+  const [kmFinalInput, setKmFinalInput] = useState<number>(initialV.km_atuais);
   const [nivelCombustivel, setNivelCombustivel] = useState<'RESERVA' | '1/4' | '1/2' | '3/4' | 'CHEIO'>('CHEIO');
   const [abasteceu, setAbasteceu] = useState<boolean>(false);
   const [litros, setLitros] = useState<number>(0);
   const [valorEuros, setValorEuros] = useState<number>(0);
-  const [locChaveSelected, setLocChaveSelected] = useState<string>('');
-  const [locViaturaSelected, setLocViaturaSelected] = useState<string>('');
+  const [locChaveSelected, setLocChaveSelected] = useState<string>('Chaveiro Principal - Armário A');
+  const [locViaturaSelected, setLocViaturaSelected] = useState<string>('Parque Principal EQ991');
   const [locChaveOutro, setLocChaveOutro] = useState<string>('');
   const [locViaturaOutro, setLocViaturaOutro] = useState<string>('');
 
@@ -66,7 +74,6 @@ export default function ChavePage() {
 
   // UI state
   const [activeTab, setActiveTab] = useState<'INICIAR' | 'ALTERNAR' | 'FINALIZAR'>('INICIAR');
-  const [loading, setLoading] = useState<boolean>(true);
   const [showCloseSuccessModal, setShowCloseSuccessModal] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
@@ -76,34 +83,34 @@ export default function ChavePage() {
 
     async function loadData() {
       try {
-        // Load Viatura
+        // Load Viatura from Supabase
         const { data: vData } = await supabase.from('viaturas').select('*').eq('qr_code_token', qrToken).single();
-        const v: Viatura = vData || MOCK_VIATURAS.find((item) => item.qr_code_token === qrToken) || MOCK_VIATURAS[0];
-        setViatura(v);
-        setKmInicialInput(v.km_atuais);
-        setKmFinalInput(v.km_atuais);
+        if (vData) {
+          setViatura(vData);
+          setKmInicialInput(vData.km_atuais);
+          setKmFinalInput(vData.km_atuais);
+        }
 
         // Load Locais
         const { data: lData } = await supabase.from('locais').select('*').eq('is_ativo', true);
-        const locaisList: LocalItem[] = lData && lData.length > 0 ? lData : MOCK_LOCAIS;
+        if (lData && lData.length > 0) {
+          const chaves = lData.filter((l) => l.tipo === 'CHAVE');
+          const vtrs = lData.filter((l) => l.tipo === 'VIATURA');
+          setLocaisChave(chaves);
+          setLocaisViatura(vtrs);
 
-        const chaves = locaisList.filter((l) => l.tipo === 'CHAVE');
-        const vtrs = locaisList.filter((l) => l.tipo === 'VIATURA');
+          const defChave = chaves.find((c) => c.is_predefinido) || chaves[0];
+          const defVtr = vtrs.find((v) => v.is_predefinido) || vtrs[0];
+          if (defChave) setLocChaveSelected(defChave.nome);
+          if (defVtr) setLocViaturaSelected(defVtr.nome);
+        }
 
-        setLocaisChave(chaves);
-        setLocaisViatura(vtrs);
-
-        const defChave = chaves.find((c) => c.is_predefinido) || chaves[0];
-        const defVtr = vtrs.find((v) => v.is_predefinido) || vtrs[0];
-
-        if (defChave) setLocChaveSelected(defChave.nome);
-        if (defVtr) setLocViaturaSelected(defVtr.nome);
-
-        // Check if there is an active march for this vehicle
+        // Check active march
+        const targetV = vData || initialV;
         const { data: mData } = await supabase
           .from('registos_marcha')
           .select('*')
-          .eq('viatura_id', v.id)
+          .eq('viatura_id', targetV.id)
           .is('data_chegada', null)
           .order('data_saida', { ascending: false })
           .limit(1);
@@ -112,16 +119,12 @@ export default function ChavePage() {
           setMarchaAtiva(mData[0]);
           setActiveTab('FINALIZAR');
           setIsGpsTrackingActive(true);
-        } else if (v.estado === 'EM_USO') {
+        } else if (targetV.estado === 'EM_USO') {
           setActiveTab('FINALIZAR');
           setIsGpsTrackingActive(true);
-        } else {
-          setActiveTab('INICIAR');
         }
       } catch (err) {
-        console.error('Erro ao carregar chave:', err);
-      } finally {
-        setLoading(false);
+        console.error('Carregamento assíncrono em segundo plano:', err);
       }
     }
 
@@ -149,7 +152,7 @@ export default function ChavePage() {
         data_saida: new Date().toISOString()
       };
 
-      const { data, error } = await supabase.from('registos_marcha').insert([newMarcha]).select();
+      const { data } = await supabase.from('registos_marcha').insert([newMarcha]).select();
       const marchaRec = data && data.length > 0 ? data[0] : { id: `mar-${Date.now()}`, ...newMarcha };
       setMarchaAtiva(marchaRec);
 
@@ -241,36 +244,9 @@ export default function ChavePage() {
             estado_anomalia: 'PENDENTE'
           }
         ]);
-
-        // Send breakdown critical email notification to logistics
-        fetch('/api/emails', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tipo: 'ALERTA_ANOMALIA',
-            matricula: viatura.matricula,
-            nip: profile.nip,
-            descricao: descricaoAnomalia,
-            gravidade: gravidadeAnomalia
-          })
-        }).catch(console.error);
       }
 
-      // 3. Send critical fuel email if < 1/4
-      if (nivelCombustivel === 'RESERVA' || nivelCombustivel === '1/4') {
-        fetch('/api/emails', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tipo: 'COMBUSTIVEL_CRITICO',
-            matricula: viatura.matricula,
-            nivelCombustivel,
-            nip: profile.nip
-          })
-        }).catch(console.error);
-      }
-
-      // 4. Update Vehicle State to DISPONIVEL
+      // 3. Update Vehicle State to DISPONIVEL
       await supabase
         .from('viaturas')
         .update({
@@ -282,34 +258,20 @@ export default function ChavePage() {
         })
         .eq('id', viatura.id);
 
+      setViatura({
+        ...viatura,
+        estado: 'DISPONIVEL',
+        km_atuais: kmFinalInput,
+        localizacao_atual_viatura: finalVtrLoc,
+        localizacao_atual_chave: finalKeyLoc
+      });
+
       setIsGpsTrackingActive(false);
       setShowCloseSuccessModal(true);
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao finalizar a marcha.');
     }
   };
-
-  if (loading) {
-    return (
-      <div className="py-16 text-center space-y-3">
-        <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-        <p className="text-xs text-slate-400 font-mono">A ler QR Code / Tag NFC da viatura...</p>
-      </div>
-    );
-  }
-
-  if (!viatura) {
-    return (
-      <div className="max-w-md mx-auto py-12 text-center space-y-4">
-        <AlertTriangle className="w-12 h-12 text-rose-500 mx-auto" />
-        <h1 className="text-lg font-bold text-slate-100 uppercase">Viatura Não Encontrada</h1>
-        <p className="text-xs text-slate-400">O código QR / NFC lido ({qrToken}) não corresponde a nenhuma viatura registada.</p>
-        <Link href="/recomendada" className="inline-block px-4 py-2 bg-slate-800 text-slate-200 text-xs font-bold rounded">
-          Voltar às Recomendadas
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-xl mx-auto space-y-6 py-2">
@@ -337,6 +299,41 @@ export default function ChavePage() {
         <div className="text-right font-mono text-xs">
           <span className="text-slate-500 block">ODÓMETRO</span>
           <span className="text-emerald-400 font-bold text-sm">{viatura.km_atuais.toLocaleString()} KM</span>
+        </div>
+      </div>
+
+      {/* Highlighted KEY LOCATION Card */}
+      <div className="p-4 rounded-xl glass-panel border-2 border-amber-500/40 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+            <Key className="w-4 h-4" />
+            <span>SÍTIO / LOCALIZAÇÃO DA CHAVE (CHAVEIRO)</span>
+          </div>
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-800">
+            RECOLHA
+          </span>
+        </div>
+
+        <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+          <div>
+            <span className="text-slate-400 text-[10px] block font-mono">CHAVEIRO DE LEVANTAMENTO</span>
+            <span className="text-slate-100 font-bold text-sm">{viatura.localizacao_atual_chave || 'Chaveiro Principal - Armário A'}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-slate-400 text-[10px] block font-mono">PARQUEAMENTO DA VIATURA</span>
+            <span className="text-slate-300 font-semibold text-xs">{viatura.localizacao_atual_viatura || 'Parque Principal EQ991'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Map of Last Vehicle Location */}
+      <div className="p-4 rounded-xl glass-panel border border-slate-800 space-y-2">
+        <div className="flex items-center space-x-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
+          <MapPin className="w-4 h-4 text-emerald-400" />
+          <span>Última Localização GPS Conhecida da Viatura</span>
+        </div>
+        <div className="h-56 rounded-lg overflow-hidden border border-slate-800">
+          <MapView viaturas={[viatura]} />
         </div>
       </div>
 
@@ -424,7 +421,7 @@ export default function ChavePage() {
 
             {/* OCR Component */}
             <OdometerScanner
-              onKmDetected={(km, photo) => {
+              onKmDetected={(km) => {
                 if (km > 0) setKmInicialInput(km);
               }}
             />
@@ -546,85 +543,10 @@ export default function ChavePage() {
               </div>
             </div>
 
-            {/* Refuel Optional */}
-            <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-300">Abasteceu a viatura durante o serviço?</span>
-                <button
-                  type="button"
-                  onClick={() => setAbasteceu(!abasteceu)}
-                  className={`px-3 py-1 rounded text-xs font-bold ${
-                    abasteceu ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  {abasteceu ? 'SIM' : 'NÃO'}
-                </button>
-              </div>
-
-              {abasteceu && (
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Litros</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={litros}
-                      onChange={(e) => setLitros(parseFloat(e.target.value) || 0)}
-                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 font-mono text-slate-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Valor (€)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={valorEuros}
-                      onChange={(e) => setValorEuros(parseFloat(e.target.value) || 0)}
-                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 font-mono text-slate-100"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Checklist Express */}
-            <div className="space-y-2">
-              <span className="font-semibold text-slate-300 block">Checklist Express de Equipamento</span>
-              <div className="space-y-1.5">
-                <label className="flex items-center space-x-2 text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={checkDocs}
-                    onChange={(e) => setCheckDocs(e.target.checked)}
-                    className="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
-                  />
-                  <span>Documentos da Viatura (Livrete / Seguro)</span>
-                </label>
-                <label className="flex items-center space-x-2 text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={checkCartao}
-                    onChange={(e) => setCheckCartao(e.target.checked)}
-                    className="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
-                  />
-                  <span>Cartão de Combustível FAP</span>
-                </label>
-                <label className="flex items-center space-x-2 text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={checkSeguranca}
-                    onChange={(e) => setCheckSeguranca(e.target.checked)}
-                    className="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
-                  />
-                  <span>Kit de Segurança & Colete Triângulo</span>
-                </label>
-              </div>
-            </div>
-
             {/* Key & Parking Locations */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1">Localização da Chave *</label>
+                <label className="block text-slate-400 mb-1">Localização/Chaveiro de Devolução *</label>
                 <select
                   value={locChaveSelected}
                   onChange={(e) => setLocChaveSelected(e.target.value)}
@@ -632,7 +554,7 @@ export default function ChavePage() {
                 >
                   {locaisChave.map((l) => (
                     <option key={l.id} value={l.nome}>
-                      {l.nome} {l.is_predefinido ? '(Pré-definida)' : ''}
+                      {l.nome} {l.is_predefinido ? '(Pré-definido)' : ''}
                     </option>
                   ))}
                   <option value="Outro...">Outro...</option>
@@ -640,7 +562,7 @@ export default function ChavePage() {
                 {locChaveSelected === 'Outro...' && (
                   <input
                     type="text"
-                    placeholder="Especifique local da chave..."
+                    placeholder="Especifique local do chaveiro..."
                     value={locChaveOutro}
                     onChange={(e) => setLocChaveOutro(e.target.value)}
                     className="w-full px-2.5 py-1.5 mt-1 rounded bg-slate-950 border border-slate-700 text-xs"
@@ -686,53 +608,6 @@ export default function ChavePage() {
                 <span>☑️ A viatura necessita de limpeza interna/externa devido ao uso efetuado?</span>
               </label>
             </div>
-
-            {/* Anomaly Report Toggle */}
-            <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-rose-400 flex items-center space-x-1">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>Registar Anomalia / Avaria / Incidente</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setHasAnomalia(!hasAnomalia)}
-                  className={`px-3 py-1 rounded text-xs font-bold ${
-                    hasAnomalia ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  {hasAnomalia ? 'SIM' : 'NÃO'}
-                </button>
-              </div>
-
-              {hasAnomalia && (
-                <div className="space-y-2 pt-2 border-t border-slate-800">
-                  <div>
-                    <label className="block text-slate-400 mb-1">Gravidade da Anomalia</label>
-                    <select
-                      value={gravidadeAnomalia}
-                      onChange={(e: any) => setGravidadeAnomalia(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs"
-                    >
-                      <option value="LEVE">LEVE (Pequeno risco / Nota de manutenção)</option>
-                      <option value="MODERADA">MODERADA (Necessita intervenção breve)</option>
-                      <option value="GRAVE">GRAVE (Impeditiva / Viatura inoperacional)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">Descrição do Incidente</label>
-                    <textarea
-                      rows={2}
-                      value={descricaoAnomalia}
-                      onChange={(e) => setDescricaoAnomalia(e.target.value)}
-                      placeholder="Descreva a avaria, dano ou anomalia registada..."
-                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
 
           <button
@@ -740,7 +615,7 @@ export default function ChavePage() {
             className="w-full py-3.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-amber-950 flex items-center justify-center space-x-2 transition-all"
           >
             <Square className="w-4 h-4 fill-slate-950" />
-            <span>Finalizar Marcha e Devolver Chave</span>
+            <span>Finalizar Marcha e Devolver Chave no Chaveiro</span>
           </button>
         </div>
       )}
