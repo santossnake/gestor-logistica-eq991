@@ -190,11 +190,11 @@ INSERT INTO public.locais (nome, tipo, is_predefinido, is_ativo) VALUES
 ('Corpo de Guarda - Receção', 'CHAVE', false, true),
 ('Gabinete de Logística EQ991', 'CHAVE', false, true);
 
--- Viaturas Exemplo Esquadra 991 (Frota Nissan Navara 4x4)
+-- Viaturas Exemplo Esquadra 991 (Frota Nissan Navara 4x4 com KM Reais)
 INSERT INTO public.viaturas (matricula, modelo, num_lugares, tem_gancho_reboque, km_atuais, estado, necessita_limpeza, localizacao_atual_viatura, localizacao_atual_chave, latitude_atual, longitude_atual, qr_code_token, is_forcada_recomendada, km_proxima_revisao) VALUES
-('AM-96-11', 'Nissan Navara 4x4', 5, true, 42150, 'DISPONIVEL', false, 'Parque Principal EQ991', 'Chaveiro Principal - Armário A', 38.8315, -9.3385, 'VTR-991-01', true, 50000),
-('AM-96-12', 'Nissan Navara 4x4', 5, true, 38400, 'DISPONIVEL', false, 'Parque Principal EQ991', 'Chaveiro Principal - Armário A', 38.8315, -9.3385, 'VTR-991-02', false, 50000),
-('AM-96-13', 'Nissan Navara 4x4', 5, true, 35100, 'DISPONIVEL', false, 'Parque Principal EQ991', 'Chaveiro Principal - Armário A', 38.8315, -9.3385, 'VTR-991-03', false, 50000);
+('AM-96-11', 'Nissan Navara 4x4', 5, true, 98620, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro Principal - Armário A', 39.0940, -8.9670, 'VTR-991-01', true, 110000),
+('AM-96-12', 'Nissan Navara 4x4', 5, true, 105888, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro Principal - Armário A', 39.0945, -8.9675, 'VTR-991-02', false, 115000),
+('AM-96-13', 'Nissan Navara 4x4', 5, true, 102614, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro Principal - Armário A', 39.0935, -8.9665, 'VTR-991-03', false, 110000);
 
 -- Add cleaning columns to viaturas if not exists
 ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS data_ultima_limpeza TIMESTAMP WITH TIME ZONE;

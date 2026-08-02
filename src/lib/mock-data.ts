@@ -40,7 +40,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     modelo: 'Nissan Navara 4x4',
     num_lugares: 5,
     tem_gancho_reboque: true,
-    km_atuais: 42150,
+    km_atuais: 98620,
     estado: 'DISPONIVEL',
     necessita_limpeza: false,
     localizacao_atual_viatura: 'Parque Principal EQ991 (Ota)',
@@ -51,7 +51,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     ultima_localizacao_at: new Date().toISOString(),
     qr_code_token: 'VTR-991-01',
     is_forcada_recomendada: true,
-    km_proxima_revisao: 50000,
+    km_proxima_revisao: 110000,
     created_at: new Date().toISOString()
   },
   {
@@ -60,7 +60,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     modelo: 'Nissan Navara 4x4',
     num_lugares: 5,
     tem_gancho_reboque: true,
-    km_atuais: 38400,
+    km_atuais: 105888,
     estado: 'DISPONIVEL',
     necessita_limpeza: true,
     localizacao_atual_viatura: 'Parque Principal EQ991 (Ota)',
@@ -71,7 +71,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     ultima_localizacao_at: new Date().toISOString(),
     qr_code_token: 'VTR-991-02',
     is_forcada_recomendada: false,
-    km_proxima_revisao: 50000,
+    km_proxima_revisao: 115000,
     created_at: new Date().toISOString()
   },
   {
@@ -80,7 +80,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     modelo: 'Nissan Navara 4x4',
     num_lugares: 5,
     tem_gancho_reboque: true,
-    km_atuais: 35100,
+    km_atuais: 102614,
     estado: 'DISPONIVEL',
     necessita_limpeza: false,
     localizacao_atual_viatura: 'Parque Principal EQ991 (Ota)',
@@ -91,7 +91,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     ultima_localizacao_at: new Date().toISOString(),
     qr_code_token: 'VTR-991-03',
     is_forcada_recomendada: false,
-    km_proxima_revisao: 50000,
+    km_proxima_revisao: 110000,
     created_at: new Date().toISOString()
   }
 ];
