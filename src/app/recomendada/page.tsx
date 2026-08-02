@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { Car, Sparkles, CheckCircle2, ShieldAlert, Wrench, Sparkle, ArrowRight, Truck, Info, Wifi } from 'lucide-react';
 import { supabase, Viatura, Anomalia } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_ANOMALIAS } from '@/lib/mock-data';
+import { getFleetOverrides } from '@/lib/utils/cookies';
 import { NfcScanner } from '@/components/NfcScanner';
 
 export default function RecomendadaPage() {
   // Synchronous calculation of top recommended vehicle on initial render
-  const initialFleet = MOCK_VIATURAS;
+  const overrides = typeof window !== 'undefined' ? getFleetOverrides() : {};
+  const initialFleet = MOCK_VIATURAS.map((v) => (overrides[v.id] ? { ...v, ...overrides[v.id] } : v));
   const initialAnomalies = MOCK_ANOMALIAS;
   const initialForced = initialFleet.find((v) => v.is_forcada_recomendada && v.estado === 'DISPONIVEL');
   const initialRec = initialForced || initialFleet.find((v) => v.estado === 'DISPONIVEL') || initialFleet[0];
@@ -23,10 +25,13 @@ export default function RecomendadaPage() {
   useEffect(() => {
     async function loadFleet() {
       try {
+        const localOverrides = getFleetOverrides();
+
         const { data: vData } = await supabase.from('viaturas').select('*');
         const { data: aData } = await supabase.from('anomalias').select('*');
 
-        const fleet: Viatura[] = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
+        let fleet: Viatura[] = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
+        fleet = fleet.map((v) => (localOverrides[v.id] ? { ...v, ...localOverrides[v.id] } : v));
         const anomalies: Anomalia[] = aData && aData.length > 0 ? aData : MOCK_ANOMALIAS;
 
         setViaturas(fleet);

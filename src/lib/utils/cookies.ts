@@ -31,6 +31,36 @@ export const getStoredMilitaryProfile = (): MilitaryProfile => {
   return { nip: '', nome: '', posto: '', email: '' };
 };
 
+// Local Fleet Overrides Persistence (for offline / mock refresh support)
+const FLEET_OVERRIDES_KEY = 'eq991_fleet_overrides_v1';
+
+export function getFleetOverrides(): Record<string, any> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(FLEET_OVERRIDES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+export function saveFleetOverride(viaturaId: string, updates: Record<string, any>) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getFleetOverrides();
+    const updated = {
+      ...current,
+      [viaturaId]: {
+        ...(current[viaturaId] || {}),
+        ...updates
+      }
+    };
+    localStorage.setItem(FLEET_OVERRIDES_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Erro ao guardar alteração local da frota:', err);
+  }
+}
+
 export const saveMilitaryProfile = (profile: MilitaryProfile): void => {
   if (typeof window === 'undefined') return;
 

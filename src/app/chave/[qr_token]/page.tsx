@@ -28,7 +28,7 @@ import {
   Building2,
   LocateFixed
 } from 'lucide-react';
-import { getStoredMilitaryProfile, saveMilitaryProfile, MilitaryProfile } from '@/lib/utils/cookies';
+import { getStoredMilitaryProfile, saveMilitaryProfile, saveFleetOverride, getFleetOverrides, MilitaryProfile } from '@/lib/utils/cookies';
 import { supabase, Viatura, LocalItem, RegistoMarcha } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_LOCAIS, MOCK_MARCHAS } from '@/lib/mock-data';
 import { LiveGpsTracker } from '@/components/LiveGpsTracker';
@@ -356,6 +356,16 @@ export default function ChavePage() {
           .eq('id', marchaAtiva.id);
       }
 
+      // 2. Save local override so state persists across page refreshes
+      saveFleetOverride(viatura.id, {
+        estado: 'DISPONIVEL',
+        km_atuais: kmFinalInput,
+        localizacao_atual_viatura: finalVtrLoc,
+        localizacao_atual_chave: finalKeyLoc,
+        necessita_limpeza: necessitaLimpeza
+      });
+
+      // 3. Update Vehicle State to DISPONIVEL in Supabase
       await supabase
         .from('viaturas')
         .update({

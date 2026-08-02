@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { supabase, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_GPS } from '@/lib/mock-data';
-import { getStoredMilitaryProfile } from '@/lib/utils/cookies';
+import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride } from '@/lib/utils/cookies';
 
 const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false });
 
@@ -79,8 +79,20 @@ export default function AdminViaturasPage() {
   useEffect(() => {
     async function loadData() {
       try {
+        const overrides = getFleetOverrides();
+
         const { data: vData } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
-        if (vData && vData.length > 0) setViaturas(vData);
+        let fleet: Viatura[] = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
+
+        // Apply local overrides for mock/refresh persistence
+        fleet = fleet.map((v) => {
+          if (overrides[v.id]) {
+            return { ...v, ...overrides[v.id] };
+          }
+          return v;
+        });
+
+        setViaturas(fleet);
 
         const { data: gData } = await supabase.from('historico_posicoes_gps').select('*').order('registado_at', { ascending: false });
         if (gData && gData.length > 0) setTodosPontosGps(gData);
@@ -117,6 +129,13 @@ export default function AdminViaturasPage() {
   const handleMarkCleaned = async (v: Viatura) => {
     const prof = getStoredMilitaryProfile();
     const nowIso = new Date().toISOString();
+
+    // 1. Save local override immediately so refresh keeps it clean
+    saveFleetOverride(v.id, {
+      necessita_limpeza: false,
+      data_ultima_limpeza: nowIso,
+      limpo_por_nip: prof.nip || 'LOGÍSTICA'
+    });
 
     try {
       await supabase
