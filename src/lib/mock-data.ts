@@ -51,8 +51,8 @@ export const MOCK_VIATURAS: Viatura[] = [
     ultima_localizacao_at: new Date().toISOString(),
     qr_code_token: 'VTR-991-01',
     is_forcada_recomendada: true,
-    km_proxima_revisao: 110000,
-    data_proxima_revisao: '2026-11-15',
+    km_proxima_revisao: 100000,
+    data_proxima_revisao: '2027-08-02',
     created_at: new Date().toISOString()
   },
   {
@@ -72,8 +72,8 @@ export const MOCK_VIATURAS: Viatura[] = [
     ultima_localizacao_at: new Date().toISOString(),
     qr_code_token: 'VTR-991-02',
     is_forcada_recomendada: false,
-    km_proxima_revisao: 115000,
-    data_proxima_revisao: '2026-10-01',
+    km_proxima_revisao: 110000,
+    data_proxima_revisao: '2027-08-02',
     created_at: new Date().toISOString()
   },
   {
@@ -94,7 +94,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     qr_code_token: 'VTR-991-03',
     is_forcada_recomendada: false,
     km_proxima_revisao: 110000,
-    data_proxima_revisao: '2026-12-01',
+    data_proxima_revisao: '2027-08-02',
     created_at: new Date().toISOString()
   }
 ];

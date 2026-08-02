@@ -79,12 +79,22 @@ export default function AdminViaturasPage() {
   const [abastGpsLat, setAbastGpsLat] = useState<number | null>(null);
   const [abastGpsLng, setAbastGpsLng] = useState<number | null>(null);
 
-  // Helper to ensure real odometers > 90k KM
+  // Helper to ensure real odometers and next maintenance target (multiple of 10,000 KM & 1 year from today)
   const sanitizeViaturaKm = (v: Viatura): Viatura => {
-    if (v.matricula === 'AM-96-11' && v.km_atuais < 90000) return { ...v, km_atuais: 98620 };
-    if (v.matricula === 'AM-96-12' && v.km_atuais < 90000) return { ...v, km_atuais: 105888 };
-    if (v.matricula === 'AM-96-13' && v.km_atuais < 90000) return { ...v, km_atuais: 102614 };
-    return v;
+    let km = v.km_atuais;
+    if (v.matricula === 'AM-96-11' && km < 90000) km = 98620;
+    if (v.matricula === 'AM-96-12' && km < 90000) km = 105888;
+    if (v.matricula === 'AM-96-13' && km < 90000) km = 102614;
+
+    const nextKmTarget = Math.ceil((km + 1) / 10000) * 10000;
+    const nextDateTarget = '2027-08-02';
+
+    return {
+      ...v,
+      km_atuais: km,
+      km_proxima_revisao: v.km_proxima_revisao && v.km_proxima_revisao >= km ? v.km_proxima_revisao : nextKmTarget,
+      data_proxima_revisao: v.data_proxima_revisao || nextDateTarget
+    };
   };
 
   useEffect(() => {
@@ -287,8 +297,8 @@ export default function AdminViaturasPage() {
     setKmAtuais(98620);
     setLocalViatura('Parque Principal EQ991 (Ota)');
     setLocalChave('Chaveiro Principal - Armário A');
-    setKmProximaRevisao(110000);
-    setDataProximaRevisao('2026-11-15');
+    setKmProximaRevisao(100000);
+    setDataProximaRevisao('2027-08-02');
     setIsModalOpen(true);
   };
 
@@ -301,8 +311,8 @@ export default function AdminViaturasPage() {
     setKmAtuais(v.km_atuais);
     setLocalViatura(v.localizacao_atual_viatura);
     setLocalChave(v.localizacao_atual_chave);
-    setKmProximaRevisao(v.km_proxima_revisao || v.km_atuais + 10000);
-    setDataProximaRevisao(v.data_proxima_revisao || '2026-11-15');
+    setKmProximaRevisao(v.km_proxima_revisao || Math.ceil((v.km_atuais + 1) / 10000) * 10000);
+    setDataProximaRevisao(v.data_proxima_revisao || '2027-08-02');
     setIsModalOpen(true);
   };
 
