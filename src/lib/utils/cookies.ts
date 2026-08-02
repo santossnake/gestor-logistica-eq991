@@ -7,6 +7,31 @@ export interface MilitaryProfile {
   email: string;
 }
 
+export const POSTOS_FORCA_AEREA = [
+  'SOL',
+  '2CAB',
+  '1CAB',
+  'CADJ',
+  '2FUR',
+  'FUR',
+  '2SAR',
+  '1SAR',
+  'SAJ',
+  'SCH',
+  'SMOR',
+  'ASPOF',
+  'ALF',
+  'TEN',
+  'CAP',
+  'MAJ',
+  'TCOR',
+  'COR',
+  'BGEN',
+  'MGEN',
+  'TGEN',
+  'GEN'
+];
+
 const MILITARY_PROFILE_COOKIE_KEY = 'eq991_military_profile';
 
 export const getStoredMilitaryProfile = (): MilitaryProfile => {

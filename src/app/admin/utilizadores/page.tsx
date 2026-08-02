@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Shield, Mail, KeyRound, Plus, Edit2, Trash2, Send, CheckCircle2, AlertTriangle, RefreshCw, Badge } from 'lucide-react';
 import { supabase, UtilizadorLogistica } from '@/lib/supabase/client';
 import { MOCK_UTILIZADORES_LOGISTICA } from '@/lib/mock-data';
+import { POSTOS_FORCA_AEREA } from '@/lib/utils/cookies';
 
 export default function GestaoUtilizadoresPage() {
   const [utilizadores, setUtilizadores] = useState<UtilizadorLogistica[]>([]);
@@ -239,23 +240,20 @@ export default function GestaoUtilizadoresPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-slate-400 mb-1">Posto / Graduação *</label>
-            <select
-              value={posto}
-              onChange={(e) => setPosto(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100"
-            >
-              <option value="Cabo">Cabo</option>
-              <option value="Primeiro-Cabo">Primeiro-Cabo</option>
-              <option value="Segundo-Sargento">Segundo-Sargento</option>
-              <option value="Primeiro-Sargento">Primeiro-Sargento</option>
-              <option value="Sargento-Ajudante">Sargento-Ajudante</option>
-              <option value="Tenente">Tenente</option>
-              <option value="Capitão">Capitão</option>
-              <option value="Major">Major</option>
-            </select>
-          </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Posto / Graduação *</label>
+                  <select
+                    value={posto}
+                    onChange={(e) => setPosto(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs"
+                  >
+                    {POSTOS_FORCA_AEREA.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
           <div>
             <label className="block text-slate-400 mb-1">Especialidade *</label>

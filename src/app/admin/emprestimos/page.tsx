@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Building, Camera, CheckCircle2, Shield, Calendar, User, Phone, Mail, FileText, AlertCircle, ArrowRight } from 'lucide-react';
 import { supabase, Viatura, EmprestimoExterno, FotoEmprestimo } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_EMPRESTIMOS, MOCK_FOTOS_EMPRESTIMO } from '@/lib/mock-data';
+import { POSTOS_FORCA_AEREA } from '@/lib/utils/cookies';
 
 const ANGULOS_INSPECAO = [
   { id: 'FRENTE', label: '1. Frente / Para-choques *', req: true },
@@ -23,6 +24,7 @@ export default function EmprestimosPage() {
   // Form states
   const [selectedViaturaId, setSelectedViaturaId] = useState<string>('');
   const [entidade, setEntidade] = useState<string>('');
+  const [entidadePosto, setEntidadePosto] = useState<string>('TEN');
   const [nomeResp, setNomeResp] = useState<string>('');
   const [contactoResp, setContactoResp] = useState<string>('');
   const [emailResp, setEmailResp] = useState<string>('');
@@ -225,6 +227,21 @@ export default function EmprestimosPage() {
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm"
               />
             </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Posto / Graduação do Responsável *</label>
+                <select
+                  value={entidadePosto || 'TEN'}
+                  onChange={(e) => setEntidadePosto(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs"
+                >
+                  {POSTOS_FORCA_AEREA.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
             <div>
               <label className="block text-xs text-slate-400 mb-1">Nome do Responsável *</label>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, FileText, User, Mail, Shield, Truck, CheckCircle2, AlertCircle } from 'lucide-react';
-import { getStoredMilitaryProfile, saveMilitaryProfile, MilitaryProfile } from '@/lib/utils/cookies';
+import { getStoredMilitaryProfile, saveMilitaryProfile, MilitaryProfile, POSTOS_FORCA_AEREA } from '@/lib/utils/cookies';
 import { supabase, Pedido } from '@/lib/supabase/client';
 import { MOCK_PEDIDOS } from '@/lib/mock-data';
 
@@ -206,22 +206,17 @@ export default function PedidoPage() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Posto / Graduação *</label>
+              <label className="block text-slate-400 mb-1 font-semibold text-xs">Posto / Graduação *</label>
               <select
                 value={profile.posto}
                 onChange={(e) => setProfile({ ...profile, posto: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold focus:outline-none focus:border-emerald-500"
               >
-                <option value="Soldado">Soldado</option>
-                <option value="Cabo">Cabo</option>
-                <option value="Primeiro-Cabo">Primeiro-Cabo</option>
-                <option value="Segundo-Sargento">Segundo-Sargento</option>
-                <option value="Primeiro-Sargento">Primeiro-Sargento</option>
-                <option value="Sargento-Ajudante">Sargento-Ajudante</option>
-                <option value="Tenente">Tenente</option>
-                <option value="Capitão">Capitão</option>
-                <option value="Major">Major</option>
-                <option value="Civil">Civil / Outro</option>
+                {POSTOS_FORCA_AEREA.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
               </select>
             </div>
 
