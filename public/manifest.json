@@ -1,0 +1,24 @@
+{
+  "name": "Esquadra 991 - Gestão de Viaturas & Reboque",
+  "short_name": "Esquadra 991",
+  "description": "Aplicação tática de gestão, reserva, rastreio GPS e vistoria de viaturas da Esquadra 991 (Força Aérea Portuguesa)",
+  "start_url": "/recomendada",
+  "display": "standalone",
+  "background_color": "#080c14",
+  "theme_color": "#080c14",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://api.qrserver.com/v1/create-qr-code/?size=192x192&data=EQ991",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=EQ991",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
