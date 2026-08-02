@@ -72,8 +72,10 @@ export default function ChavePage() {
   const [abasteceu, setAbasteceu] = useState<boolean>(false);
   const [litros, setLitros] = useState<number>(0);
   const [valorEuros, setValorEuros] = useState<number>(0);
-  const [locChaveSelected, setLocChaveSelected] = useState<string>('Chaveiro Principal - Armário A');
-  const [locViaturaSelected, setLocViaturaSelected] = useState<string>('Parque Principal EQ991 (Ota)');
+  const [locChaveSelected, setLocChaveSelected] = useState<string>('Chaveiro 991');
+  const [locViaturaSelected, setLocViaturaSelected] = useState<string>('Telheiro 991');
+  const [customLocChave, setCustomLocChave] = useState<string>('');
+  const [customLocViatura, setCustomLocViatura] = useState<string>('');
 
   const [checkDocs, setCheckDocs] = useState<boolean>(true);
   const [checkCartao, setCheckCartao] = useState<boolean>(true);
@@ -332,8 +334,8 @@ export default function ChavePage() {
     saveMilitaryProfile(profile);
     setErrorMsg('');
 
-    const finalKeyLoc = locChaveSelected;
-    const finalVtrLoc = locViaturaSelected;
+    const finalKeyLoc = locChaveSelected === 'Outro...' ? customLocChave || 'Local Outro' : locChaveSelected;
+    const finalVtrLoc = locViaturaSelected === 'Outro...' ? customLocViatura || 'Local Outro' : locViaturaSelected;
 
     try {
       if (marchaAtiva) {
@@ -686,7 +688,7 @@ export default function ChavePage() {
                 <select
                   value={locChaveSelected}
                   onChange={(e) => setLocChaveSelected(e.target.value)}
-                  className="w-full px-2.5 py-2 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs"
+                  className="w-full px-2.5 py-2 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold"
                 >
                   {locaisChave.map((l) => (
                     <option key={l.id} value={l.nome}>
@@ -695,6 +697,17 @@ export default function ChavePage() {
                   ))}
                   <option value="Outro...">Outro...</option>
                 </select>
+
+                {locChaveSelected === 'Outro...' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Escreva a localização do chaveiro..."
+                    value={customLocChave}
+                    onChange={(e) => setCustomLocChave(e.target.value)}
+                    className="w-full mt-2 px-2.5 py-1.5 rounded bg-slate-950 border border-amber-500/60 text-slate-100 text-xs animate-in fade-in"
+                  />
+                )}
               </div>
 
               <div>
@@ -702,7 +715,7 @@ export default function ChavePage() {
                 <select
                   value={locViaturaSelected}
                   onChange={(e) => setLocViaturaSelected(e.target.value)}
-                  className="w-full px-2.5 py-2 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs"
+                  className="w-full px-2.5 py-2 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold"
                 >
                   {locaisViatura.map((l) => (
                     <option key={l.id} value={l.nome}>
@@ -711,6 +724,17 @@ export default function ChavePage() {
                   ))}
                   <option value="Outro...">Outro...</option>
                 </select>
+
+                {locViaturaSelected === 'Outro...' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Escreva o local de parqueamento..."
+                    value={customLocViatura}
+                    onChange={(e) => setCustomLocViatura(e.target.value)}
+                    className="w-full mt-2 px-2.5 py-1.5 rounded bg-slate-950 border border-amber-500/60 text-slate-100 text-xs animate-in fade-in"
+                  />
+                )}
               </div>
             </div>
 

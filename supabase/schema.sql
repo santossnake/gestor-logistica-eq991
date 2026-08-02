@@ -186,17 +186,21 @@ INSERT INTO public.locais (nome, tipo, is_predefinido, is_ativo) VALUES
 
 -- Locais Predefinidos
 INSERT INTO public.locais (nome, tipo, is_predefinido, is_ativo) VALUES
-('Parque Principal EQ991 (Ota)', 'VIATURA', true, true),
-('Parque Secundário (Plataforma Ota)', 'VIATURA', false, true),
+('Telheiro 991', 'VIATURA', true, true),
+('Estacionamento Alternativo ao Telheiro 991', 'VIATURA', false, true),
+('Hangar 6', 'VIATURA', false, true),
+('Oficial de Dia', 'VIATURA', false, true),
+('Hotel Mirandela', 'VIATURA', false, true),
+('Alojamento BA11', 'VIATURA', false, true),
 ('Chaveiro 991', 'CHAVE', true, true),
 ('Logística', 'CHAVE', false, true),
 ('Oficial de Dia', 'CHAVE', false, true);
 
 -- Viaturas Exemplo Esquadra 991 (Frota Nissan Navara 4x4 com KM Reais e Manutenção Atualizada)
 INSERT INTO public.viaturas (matricula, modelo, num_lugares, tem_gancho_reboque, km_atuais, estado, necessita_limpeza, localizacao_atual_viatura, localizacao_atual_chave, latitude_atual, longitude_atual, qr_code_token, is_forcada_recomendada, km_proxima_revisao, data_proxima_revisao) VALUES
-('AM-96-11', 'Nissan Navara 4x4', 5, true, 98620, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro 991', 39.0940, -8.9670, 'VTR-991-01', true, 100000, '2027-08-02'),
-('AM-96-12', 'Nissan Navara 4x4', 5, true, 105888, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro 991', 39.0945, -8.9675, 'VTR-991-02', false, 110000, '2027-08-02'),
-('AM-96-13', 'Nissan Navara 4x4', 5, true, 102614, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro 991', 39.0935, -8.9665, 'VTR-991-03', false, 110000, '2027-08-02');
+('AM-96-11', 'Nissan Navara 4x4', 5, true, 98620, 'DISPONIVEL', false, 'Telheiro 991', 'Chaveiro 991', 39.0940, -8.9670, 'VTR-991-01', true, 100000, '2027-08-02'),
+('AM-96-12', 'Nissan Navara 4x4', 5, true, 105888, 'DISPONIVEL', false, 'Telheiro 991', 'Chaveiro 991', 39.0945, -8.9675, 'VTR-991-02', false, 110000, '2027-08-02'),
+('AM-96-13', 'Nissan Navara 4x4', 5, true, 102614, 'DISPONIVEL', false, 'Telheiro 991', 'Chaveiro 991', 39.0935, -8.9665, 'VTR-991-03', false, 110000, '2027-08-02');
 
 -- Add maintenance date column if not exists
 ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS data_proxima_revisao TIMESTAMP WITH TIME ZONE;

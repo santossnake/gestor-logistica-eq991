@@ -43,7 +43,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     km_atuais: 98620,
     estado: 'DISPONIVEL',
     necessita_limpeza: false,
-    localizacao_atual_viatura: 'Parque Principal EQ991 (Ota)',
+    localizacao_atual_viatura: 'Telheiro 991',
     localizacao_atual_chave: 'Chaveiro 991',
     latitude_atual: 39.0940,
     longitude_atual: -8.9670,
@@ -64,7 +64,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     km_atuais: 105888,
     estado: 'DISPONIVEL',
     necessita_limpeza: true,
-    localizacao_atual_viatura: 'Parque Principal EQ991 (Ota)',
+    localizacao_atual_viatura: 'Telheiro 991',
     localizacao_atual_chave: 'Chaveiro 991',
     latitude_atual: 39.0945,
     longitude_atual: -8.9675,
@@ -85,7 +85,7 @@ export const MOCK_VIATURAS: Viatura[] = [
     km_atuais: 102614,
     estado: 'DISPONIVEL',
     necessita_limpeza: false,
-    localizacao_atual_viatura: 'Parque Principal EQ991 (Ota)',
+    localizacao_atual_viatura: 'Telheiro 991',
     localizacao_atual_chave: 'Chaveiro 991',
     latitude_atual: 39.0935,
     longitude_atual: -8.9665,
@@ -100,11 +100,15 @@ export const MOCK_VIATURAS: Viatura[] = [
 ];
 
 export const MOCK_LOCAIS: LocalItem[] = [
-  { id: 'loc-01', nome: 'Parque Principal EQ991 (Ota)', tipo: 'VIATURA', is_predefinido: true, is_ativo: true },
-  { id: 'loc-02', nome: 'Parque Secundário (Plataforma Ota)', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
-  { id: 'loc-03', nome: 'Chaveiro 991', tipo: 'CHAVE', is_predefinido: true, is_ativo: true },
-  { id: 'loc-04', nome: 'Logística', tipo: 'CHAVE', is_predefinido: false, is_ativo: true },
-  { id: 'loc-05', nome: 'Oficial de Dia', tipo: 'CHAVE', is_predefinido: false, is_ativo: true }
+  { id: 'loc-01', nome: 'Telheiro 991', tipo: 'VIATURA', is_predefinido: true, is_ativo: true },
+  { id: 'loc-02', nome: 'Estacionamento Alternativo ao Telheiro 991', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
+  { id: 'loc-03', nome: 'Hangar 6', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
+  { id: 'loc-04', nome: 'Oficial de Dia', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
+  { id: 'loc-05', nome: 'Hotel Mirandela', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
+  { id: 'loc-06', nome: 'Alojamento BA11', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
+  { id: 'loc-07', nome: 'Chaveiro 991', tipo: 'CHAVE', is_predefinido: true, is_ativo: true },
+  { id: 'loc-08', nome: 'Logística', tipo: 'CHAVE', is_predefinido: false, is_ativo: true },
+  { id: 'loc-09', nome: 'Oficial de Dia', tipo: 'CHAVE', is_predefinido: false, is_ativo: true }
 ];
 
 export const MOCK_PEDIDOS: Pedido[] = [
