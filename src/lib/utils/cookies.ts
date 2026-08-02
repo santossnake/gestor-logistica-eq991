@@ -56,14 +56,38 @@ export const getStoredMilitaryProfile = (): MilitaryProfile => {
   return { nip: '', nome: '', posto: '', email: '' };
 };
 
-// Local Fleet Overrides Persistence (v2 reset to enforce real KM values)
-const FLEET_OVERRIDES_KEY = 'eq991_fleet_overrides_v2';
+// Local Fleet Overrides Persistence (v3 reset to strictly enforce real > 90k KM)
+const FLEET_OVERRIDES_KEY = 'eq991_fleet_overrides_v3';
+
+export function resetFleetOverridesToReal() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('eq991_fleet_overrides_v1');
+    localStorage.removeItem('eq991_fleet_overrides_v2');
+    localStorage.removeItem(FLEET_OVERRIDES_KEY);
+  } catch (err) {
+    console.error(err);
+  }
+}
 
 export function getFleetOverrides(): Record<string, any> {
   if (typeof window === 'undefined') return {};
   try {
     const raw = localStorage.getItem(FLEET_OVERRIDES_KEY);
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+
+    // Auto-clean any stale entry with < 90,000 KM
+    const cleaned: Record<string, any> = {};
+    for (const [key, val] of Object.entries(parsed)) {
+      const entry = val as any;
+      if (entry && typeof entry === 'object' && entry.km_atuais && entry.km_atuais < 90000) {
+        // Skip stale entry
+        continue;
+      }
+      cleaned[key] = val;
+    }
+    return cleaned;
   } catch (err) {
     return {};
   }

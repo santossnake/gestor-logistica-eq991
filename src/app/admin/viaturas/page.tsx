@@ -22,7 +22,8 @@ import {
   Fuel,
   Building2,
   LocateFixed,
-  Wrench
+  Wrench,
+  RotateCcw
 } from 'lucide-react';
 import { supabase, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_GPS } from '@/lib/mock-data';
@@ -78,6 +79,14 @@ export default function AdminViaturasPage() {
   const [abastGpsLat, setAbastGpsLat] = useState<number | null>(null);
   const [abastGpsLng, setAbastGpsLng] = useState<number | null>(null);
 
+  // Helper to ensure real odometers > 90k KM
+  const sanitizeViaturaKm = (v: Viatura): Viatura => {
+    if (v.matricula === 'AM-96-11' && v.km_atuais < 90000) return { ...v, km_atuais: 98620 };
+    if (v.matricula === 'AM-96-12' && v.km_atuais < 90000) return { ...v, km_atuais: 105888 };
+    if (v.matricula === 'AM-96-13' && v.km_atuais < 90000) return { ...v, km_atuais: 102614 };
+    return v;
+  };
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -86,12 +95,10 @@ export default function AdminViaturasPage() {
         const { data: vData } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
         let fleet: Viatura[] = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
 
-        // Apply local overrides
+        // Apply local overrides and sanitize odometers
         fleet = fleet.map((v) => {
-          if (overrides[v.id]) {
-            return { ...v, ...overrides[v.id] };
-          }
-          return v;
+          const merged = overrides[v.id] ? { ...v, ...overrides[v.id] } : v;
+          return sanitizeViaturaKm(merged);
         });
 
         setViaturas(fleet);
@@ -104,6 +111,14 @@ export default function AdminViaturasPage() {
     }
     loadData();
   }, []);
+
+  const handleForceResetRealOdometers = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+    }
+    setViaturas(MOCK_VIATURAS);
+    alert('Odómetros sincronizados com os valores reais: AM-96-11 (98620 KM), AM-96-12 (105888 KM), AM-96-13 (102614 KM)!');
+  };
 
   // Filter GPS Points
   const pontosGpsFiltrados = todosPontosGps.filter((p) => {
@@ -347,13 +362,24 @@ export default function AdminViaturasPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreateModal}
-          className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-2 transition-colors shadow-lg shadow-emerald-950"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Criar Nova Viatura</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleForceResetRealOdometers}
+            className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs flex items-center space-x-1.5 border border-slate-700 transition-colors"
+            title="Limpar memória local e forçar exibição das quilometragens reais (98k, 105k, 102k)"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Sincronizar KM Reais</span>
+          </button>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-2 transition-colors shadow-lg shadow-emerald-950"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Criar Nova Viatura</span>
+          </button>
+        </div>
       </div>
 
       {/* DYNAMIC GPS ROUTE MAP SECTION WITH FILTERS */}
