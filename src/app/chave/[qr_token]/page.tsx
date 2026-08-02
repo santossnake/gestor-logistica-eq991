@@ -22,7 +22,9 @@ import {
   Briefcase,
   AlertCircle,
   Navigation,
-  Info
+  Info,
+  Wrench,
+  Siren
 } from 'lucide-react';
 import { getStoredMilitaryProfile, saveMilitaryProfile, MilitaryProfile } from '@/lib/utils/cookies';
 import { supabase, Viatura, LocalItem, RegistoMarcha } from '@/lib/supabase/client';
@@ -58,19 +60,21 @@ export default function ChavePage() {
   const [litros, setLitros] = useState<number>(0);
   const [valorEuros, setValorEuros] = useState<number>(0);
   const [locChaveSelected, setLocChaveSelected] = useState<string>('Chaveiro Principal - Armário A');
-  const [locViaturaSelected, setLocViaturaSelected] = useState<string>('Parque Principal EQ991');
+  const [locViaturaSelected, setLocViaturaSelected] = useState<string>('Parque Principal EQ991 (Ota)');
   const [locChaveOutro, setLocChaveOutro] = useState<string>('');
   const [locViaturaOutro, setLocViaturaOutro] = useState<string>('');
 
   const [checkDocs, setCheckDocs] = useState<boolean>(true);
   const [checkCartao, setCheckCartao] = useState<boolean>(true);
   const [checkSeguranca, setCheckSeguranca] = useState<boolean>(true);
-  const [necessitaLimpeza, setNecessitaLimpeza] = useState<boolean>(false);
+  const [necessitaLimpeza, setNecessitaLimpeza] = useState<boolean>(initialV.necessita_limpeza || false);
 
-  // Anomalia / Incidente
-  const [hasAnomalia, setHasAnomalia] = useState<boolean>(false);
+  // Anomalia / Incidente em marcha Modal
+  const [showReportIssueModal, setShowReportIssueModal] = useState<boolean>(false);
+  const [tipoAnomalia, setTipoAnomalia] = useState<string>('Luz de Manutenção / Avaria no Painel');
   const [descricaoAnomalia, setDescricaoAnomalia] = useState<string>('');
-  const [gravidadeAnomalia, setGravidadeAnomalia] = useState<'LEVE' | 'MODERADA' | 'GRAVE'>('LEVE');
+  const [gravidadeAnomalia, setGravidadeAnomalia] = useState<'LEVE' | 'MODERADA' | 'GRAVE'>('MODERADA');
+  const [issueReportedSuccess, setIssueReportedSuccess] = useState<boolean>(false);
 
   // UI state
   const [activeTab, setActiveTab] = useState<'INICIAR' | 'ALTERNAR' | 'FINALIZAR'>('INICIAR');
@@ -83,15 +87,14 @@ export default function ChavePage() {
 
     async function loadData() {
       try {
-        // Load Viatura from Supabase
         const { data: vData } = await supabase.from('viaturas').select('*').eq('qr_code_token', qrToken).single();
         if (vData) {
           setViatura(vData);
           setKmInicialInput(vData.km_atuais);
           setKmFinalInput(vData.km_atuais);
+          setNecessitaLimpeza(vData.necessita_limpeza);
         }
 
-        // Load Locais
         const { data: lData } = await supabase.from('locais').select('*').eq('is_ativo', true);
         if (lData && lData.length > 0) {
           const chaves = lData.filter((l) => l.tipo === 'CHAVE');
@@ -105,7 +108,6 @@ export default function ChavePage() {
           if (defVtr) setLocViaturaSelected(defVtr.nome);
         }
 
-        // Check active march
         const targetV = vData || initialV;
         const { data: mData } = await supabase
           .from('registos_marcha')
@@ -124,7 +126,7 @@ export default function ChavePage() {
           setIsGpsTrackingActive(true);
         }
       } catch (err) {
-        console.error('Carregamento assíncrono em segundo plano:', err);
+        console.error('Carregamento assíncrono:', err);
       }
     }
 
@@ -132,6 +134,56 @@ export default function ChavePage() {
       loadData();
     }
   }, [qrToken]);
+
+  // Handler: Report In-Trip Issue
+  const handleReportIssue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!descricaoAnomalia) return;
+
+    try {
+      const fullDesc = `[${tipoAnomalia}] ${descricaoAnomalia}`;
+
+      await supabase.from('anomalias').insert([
+        {
+          viatura_id: viatura.id,
+          registo_marcha_id: marchaAtiva?.id,
+          descricao: fullDesc,
+          gravidade: gravidadeAnomalia,
+          latitude_incidente: viatura.latitude_atual || 39.094,
+          longitude_incidente: viatura.longitude_atual || -8.967,
+          estado_anomalia: 'PENDENTE'
+        }
+      ]);
+
+      // If GRAVE anomaly, update vehicle to MANUTENCAO
+      if (gravidadeAnomalia === 'GRAVE') {
+        await supabase.from('viaturas').update({ estado: 'MANUTENCAO' }).eq('id', viatura.id);
+        setViatura({ ...viatura, estado: 'MANUTENCAO' });
+      }
+
+      // Log GPS event
+      await supabase.from('historico_posicoes_gps').insert([
+        {
+          viatura_id: viatura.id,
+          registo_marcha_id: marchaAtiva?.id,
+          nip_operador: profile.nip || 'DESCONHECIDO',
+          latitude: viatura.latitude_atual || 39.094,
+          longitude: viatura.longitude_atual || -8.967,
+          tipo_evento: 'INCIDENTE',
+          registado_at: new Date().toISOString()
+        }
+      ]);
+
+      setIssueReportedSuccess(true);
+      setTimeout(() => {
+        setIssueReportedSuccess(false);
+        setShowReportIssueModal(false);
+        setDescricaoAnomalia('');
+      }, 2000);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Handler: Iniciar Marcha
   const handleIniciarMarcha = async () => {
@@ -144,7 +196,6 @@ export default function ChavePage() {
     setErrorMsg('');
 
     try {
-      // 1. Create March Record
       const newMarcha = {
         viatura_id: viatura.id,
         nip_inicio: profile.nip,
@@ -156,7 +207,6 @@ export default function ChavePage() {
       const marchaRec = data && data.length > 0 ? data[0] : { id: `mar-${Date.now()}`, ...newMarcha };
       setMarchaAtiva(marchaRec);
 
-      // 2. Update vehicle state to EM_USO
       await supabase.from('viaturas').update({ estado: 'EM_USO', km_atuais: kmInicialInput }).eq('id', viatura.id);
 
       setViatura({ ...viatura, estado: 'EM_USO', km_atuais: kmInicialInput });
@@ -178,8 +228,8 @@ export default function ChavePage() {
           viatura_id: viatura?.id,
           registo_marcha_id: marchaAtiva.id,
           nip_operador: profile.nip,
-          latitude: viatura?.latitude_atual || 38.8315,
-          longitude: viatura?.longitude_atual || -9.3385,
+          latitude: viatura?.latitude_atual || 39.094,
+          longitude: viatura?.longitude_atual || -8.967,
           tipo_evento: 'PING_PERCURSO',
           registado_at: new Date().toISOString()
         }
@@ -210,7 +260,6 @@ export default function ChavePage() {
     const finalVtrLoc = locViaturaSelected === 'Outro...' ? locViaturaOutro : locViaturaSelected;
 
     try {
-      // 1. Close March Record
       if (marchaAtiva) {
         await supabase
           .from('registos_marcha')
@@ -231,22 +280,6 @@ export default function ChavePage() {
           .eq('id', marchaAtiva.id);
       }
 
-      // 2. Insert anomaly if checked
-      if (hasAnomalia && descricaoAnomalia) {
-        await supabase.from('anomalias').insert([
-          {
-            viatura_id: viatura.id,
-            registo_marcha_id: marchaAtiva?.id,
-            descricao: descricaoAnomalia,
-            gravidade: gravidadeAnomalia,
-            latitude_incidente: viatura.latitude_atual,
-            longitude_incidente: viatura.longitude_atual,
-            estado_anomalia: 'PENDENTE'
-          }
-        ]);
-      }
-
-      // 3. Update Vehicle State to DISPONIVEL
       await supabase
         .from('viaturas')
         .update({
@@ -263,7 +296,8 @@ export default function ChavePage() {
         estado: 'DISPONIVEL',
         km_atuais: kmFinalInput,
         localizacao_atual_viatura: finalVtrLoc,
-        localizacao_atual_chave: finalKeyLoc
+        localizacao_atual_chave: finalKeyLoc,
+        necessita_limpeza: necessitaLimpeza
       });
 
       setIsGpsTrackingActive(false);
@@ -275,31 +309,67 @@ export default function ChavePage() {
 
   return (
     <div className="max-w-xl mx-auto space-y-6 py-2">
-      {/* Vehicle Info Card */}
-      <div className="p-4 rounded-xl glass-panel border border-slate-700 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-            <Key className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-mono font-black text-xl text-white tracking-widest">{viatura.matricula}</span>
-              <span
-                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                  viatura.estado === 'DISPONIVEL' ? 'bg-emerald-950 text-emerald-400' : 'bg-blue-950 text-blue-400'
-                }`}
-              >
-                {viatura.estado}
-              </span>
+      {/* Vehicle Info Header Card */}
+      <div className="p-4 rounded-xl glass-panel border border-slate-700 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+              <Key className="w-6 h-6" />
             </div>
-            <p className="text-xs font-semibold text-slate-300">{viatura.modelo}</p>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-mono font-black text-xl text-white tracking-widest">{viatura.matricula}</span>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                    viatura.estado === 'DISPONIVEL'
+                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                      : viatura.estado === 'EM_USO'
+                      ? 'bg-blue-950 text-blue-400 border border-blue-800'
+                      : 'bg-rose-950 text-rose-400 border border-rose-800'
+                  }`}
+                >
+                  {viatura.estado}
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-300">{viatura.modelo}</p>
+            </div>
+          </div>
+
+          <div className="text-right font-mono text-xs">
+            <span className="text-slate-500 block">ODÓMETRO</span>
+            <span className="text-emerald-400 font-bold text-sm">{viatura.km_atuais.toLocaleString()} KM</span>
           </div>
         </div>
 
-        <div className="text-right font-mono text-xs">
-          <span className="text-slate-500 block">ODÓMETRO</span>
-          <span className="text-emerald-400 font-bold text-sm">{viatura.km_atuais.toLocaleString()} KM</span>
+        {/* PROMINENT CLEANING BADGE IF NEEDED */}
+        {viatura.necessita_limpeza && (
+          <div className="p-3 rounded-lg bg-amber-950/90 border border-amber-500/60 text-amber-200 text-xs flex items-center space-x-2 font-bold animate-in fade-in">
+            <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>🧼 ATENÇÃO: Esta viatura necessita de limpeza interna/externa registada pelo condutor anterior.</span>
+          </div>
+        )}
+      </div>
+
+      {/* REPORT ISSUE IN TRIP BUTTON (EMERGENCY / MAINTENANCE LIGHT) */}
+      <div className="p-4 rounded-xl bg-rose-950/40 border-2 border-rose-500/50 flex items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 flex-shrink-0">
+            <Siren className="w-6 h-6 animate-pulse" />
+          </div>
+          <div>
+            <span className="font-mono font-bold text-xs text-rose-400 block uppercase">ALERTAS DE SEGURANÇA</span>
+            <h3 className="text-xs font-bold text-slate-100">Acendeu Luz de Manutenção ou Avaria?</h3>
+            <p className="text-[11px] text-slate-400">Reporte anomalias em marcha de imediato à Logística.</p>
+          </div>
         </div>
+
+        <button
+          onClick={() => setShowReportIssueModal(true)}
+          className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase flex items-center space-x-1.5 shadow-md shadow-rose-950 transition-all flex-shrink-0"
+        >
+          <AlertTriangle className="w-4 h-4" />
+          <span>Reportar Problema</span>
+        </button>
       </div>
 
       {/* Highlighted KEY LOCATION Card */}
@@ -321,7 +391,7 @@ export default function ChavePage() {
           </div>
           <div className="text-right">
             <span className="text-slate-400 text-[10px] block font-mono">PARQUEAMENTO DA VIATURA</span>
-            <span className="text-slate-300 font-semibold text-xs">{viatura.localizacao_atual_viatura || 'Parque Principal EQ991'}</span>
+            <span className="text-slate-300 font-semibold text-xs">{viatura.localizacao_atual_viatura || 'Parque Principal EQ991 (Ota)'}</span>
           </div>
         </div>
       </div>
@@ -330,7 +400,7 @@ export default function ChavePage() {
       <div className="p-4 rounded-xl glass-panel border border-slate-800 space-y-2">
         <div className="flex items-center space-x-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
           <MapPin className="w-4 h-4 text-emerald-400" />
-          <span>Última Localização GPS Conhecida da Viatura</span>
+          <span>Última Localização GPS Conhecida da Viatura (Ota: 39.094, -8.967)</span>
         </div>
         <div className="h-56 rounded-lg overflow-hidden border border-slate-800">
           <MapView viaturas={[viatura]} />
@@ -405,7 +475,6 @@ export default function ChavePage() {
                 placeholder="Ex: 134890-A"
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
               />
-              <p className="text-[10px] text-slate-500 mt-1">Pré-preenchido pelo seu perfil. Clique para alterar.</p>
             </div>
 
             <div>
@@ -419,19 +488,11 @@ export default function ChavePage() {
               />
             </div>
 
-            {/* OCR Component */}
             <OdometerScanner
               onKmDetected={(km) => {
                 if (km > 0) setKmInicialInput(km);
               }}
             />
-
-            <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 space-y-1">
-              <span className="font-bold text-emerald-400 block">📍 Ativação de Rastreio GPS</span>
-              <p className="text-slate-400">
-                Ao clicar em &quot;Iniciar Marcha&quot;, o telemóvel ativará o rastreio contínuo de percurso até ao fecho.
-              </p>
-            </div>
           </div>
 
           <button
@@ -451,10 +512,6 @@ export default function ChavePage() {
             <RefreshCcw className="w-4 h-4" />
             <span>Alternar Condutor a Meio do Serviço</span>
           </h2>
-
-          <p className="text-xs text-slate-300">
-            Passar a condução da viatura para outro militar sem fechar a marcha atual. O rastreio GPS continuará no novo dispositivo.
-          </p>
 
           <div className="space-y-3 text-xs">
             <div>
@@ -490,7 +547,6 @@ export default function ChavePage() {
           </h2>
 
           <div className="space-y-4 text-xs">
-            {/* Driver NIP */}
             <div>
               <label className="block text-slate-400 mb-1">NIP de quem entrega a chave *</label>
               <input
@@ -504,7 +560,6 @@ export default function ChavePage() {
               />
             </div>
 
-            {/* Final KM */}
             <div>
               <label className="block text-slate-400 mb-1">Quilómetros Finais do Odómetro *</label>
               <input
@@ -522,7 +577,6 @@ export default function ChavePage() {
               }}
             />
 
-            {/* Fuel Level */}
             <div>
               <label className="block text-slate-400 mb-1">Nível de Combustível *</label>
               <div className="grid grid-cols-5 gap-1.5 font-mono font-bold text-xs">
@@ -543,7 +597,6 @@ export default function ChavePage() {
               </div>
             </div>
 
-            {/* Key & Parking Locations */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-slate-400 mb-1">Localização/Chaveiro de Devolução *</label>
@@ -559,15 +612,6 @@ export default function ChavePage() {
                   ))}
                   <option value="Outro...">Outro...</option>
                 </select>
-                {locChaveSelected === 'Outro...' && (
-                  <input
-                    type="text"
-                    placeholder="Especifique local do chaveiro..."
-                    value={locChaveOutro}
-                    onChange={(e) => setLocChaveOutro(e.target.value)}
-                    className="w-full px-2.5 py-1.5 mt-1 rounded bg-slate-950 border border-slate-700 text-xs"
-                  />
-                )}
               </div>
 
               <div>
@@ -584,19 +628,9 @@ export default function ChavePage() {
                   ))}
                   <option value="Outro...">Outro...</option>
                 </select>
-                {locViaturaSelected === 'Outro...' && (
-                  <input
-                    type="text"
-                    placeholder="Especifique local do estacionamento..."
-                    value={locViaturaOutro}
-                    onChange={(e) => setLocViaturaOutro(e.target.value)}
-                    className="w-full px-2.5 py-1.5 mt-1 rounded bg-slate-950 border border-slate-700 text-xs"
-                  />
-                )}
               </div>
             </div>
 
-            {/* Cleaning Checkbox */}
             <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
               <label className="flex items-center space-x-2 text-slate-200 font-semibold cursor-pointer">
                 <input
@@ -605,7 +639,7 @@ export default function ChavePage() {
                   onChange={(e) => setNecessitaLimpeza(e.target.checked)}
                   className="rounded bg-slate-950 border-slate-700 text-amber-500 focus:ring-0 w-4 h-4"
                 />
-                <span>☑️ A viatura necessita de limpeza interna/externa devido ao uso efetuado?</span>
+                <span>🧼 A viatura necessita de limpeza interna/externa devido ao uso efetuado?</span>
               </label>
             </div>
           </div>
@@ -617,6 +651,108 @@ export default function ChavePage() {
             <Square className="w-4 h-4 fill-slate-950" />
             <span>Finalizar Marcha e Devolver Chave no Chaveiro</span>
           </button>
+        </div>
+      )}
+
+      {/* MODAL: REPORT IN-TRIP ISSUE / MAINTENANCE LIGHT */}
+      {showReportIssueModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full glass-panel p-6 rounded-2xl border-2 border-rose-500/60 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2 text-rose-400 font-bold uppercase tracking-wider text-sm">
+                <AlertTriangle className="w-5 h-5" />
+                <span>Reportar Anomalia / Luz de Manutenção</span>
+              </div>
+              <button
+                onClick={() => setShowReportIssueModal(false)}
+                className="text-slate-400 hover:text-white text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {issueReportedSuccess ? (
+              <div className="p-4 rounded-xl bg-emerald-950 border border-emerald-500 text-emerald-200 text-center space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                <p className="font-bold text-sm">Problema Reportado com Sucesso!</p>
+                <p className="text-xs text-emerald-300">A equipa de Logística foi notificada do incidente.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleReportIssue} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Tipo de Problema *</label>
+                  <select
+                    value={tipoAnomalia}
+                    onChange={(e) => setTipoAnomalia(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold"
+                  >
+                    <option value="Luz de Manutenção / Avaria no Painel">⚠️ Luz de Manutenção / Avaria no Painel</option>
+                    <option value="Anomalia Mecânica / Tração / Motor">⚙️ Anomalia Mecânica / Tração / Motor</option>
+                    <option value="Furo ou Pressão de Pneu">🛞 Furo ou Pressão de Pneu</option>
+                    <option value="Barulho Estranho ou Vibração">🔊 Barulho Estranho ou Vibração</option>
+                    <option value="Outro Incidente em Serviço">📝 Outro Incidente em Serviço</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Gravidade da Anomalia *</label>
+                  <div className="grid grid-cols-3 gap-2 font-mono font-bold text-xs">
+                    {(['LEVE', 'MODERADA', 'GRAVE'] as const).map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setGravidadeAnomalia(g)}
+                        className={`py-2 rounded border text-center transition-all ${
+                          gravidadeAnomalia === g
+                            ? g === 'GRAVE'
+                              ? 'bg-rose-600 text-white border-rose-500 font-black shadow-md'
+                              : g === 'MODERADA'
+                              ? 'bg-amber-600 text-white border-amber-500 font-black shadow-md'
+                              : 'bg-blue-600 text-white border-blue-500 font-black shadow-md'
+                            : 'bg-slate-900 text-slate-400 border-slate-800'
+                        }`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                  {gravidadeAnomalia === 'GRAVE' && (
+                    <p className="text-[10px] text-rose-400 mt-1 font-mono">
+                      * Gravidade GRAVE colocará a viatura em estado de Manutenção de imediato.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Descrição Detalhada *</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={descricaoAnomalia}
+                    onChange={(e) => setDescricaoAnomalia(e.target.value)}
+                    placeholder="Descreva o que sucedeu (ex: acendeu luz amarela do óleo a 80 km/h, pneu traseiro esquerdo com pouca pressão, etc.)"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs"
+                  ></textarea>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowReportIssueModal(false)}
+                    className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase shadow-lg shadow-rose-950"
+                  >
+                    Enviar Alerta
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       )}
 
@@ -637,7 +773,6 @@ export default function ChavePage() {
               </p>
             </div>
 
-            {/* MANDATORY REMINDER BADGE */}
             <div className="p-4 rounded-xl bg-amber-950/80 border-2 border-amber-500/60 text-amber-200 text-xs space-y-1 text-left">
               <div className="flex items-center space-x-2 font-bold uppercase tracking-wider text-amber-300">
                 <Briefcase className="w-4 h-4" />

@@ -132,6 +132,12 @@ export default function RecomendadaPage() {
                   <span>Gancho de Reboque</span>
                 </span>
               )}
+              {activeViatura.necessita_limpeza && (
+                <span className="px-3 py-1 rounded-lg bg-amber-950 border border-amber-500/50 text-xs font-mono text-amber-300 font-bold flex items-center space-x-1">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>🧼 Necessita Limpeza</span>
+                </span>
+              )}
             </div>
           </div>
 
@@ -240,6 +246,7 @@ export default function RecomendadaPage() {
                   <span>{v.km_atuais.toLocaleString()} KM</span>
                   <span>{v.num_lugares} Lugares</span>
                   {v.tem_gancho_reboque && <span className="text-amber-400">Reboque ✓</span>}
+                  {v.necessita_limpeza && <span className="text-amber-400 font-bold">🧼 Limpeza ✓</span>}
                 </div>
 
                 <div className="mt-3 flex items-center justify-between">
