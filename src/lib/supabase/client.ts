@@ -25,6 +25,7 @@ export interface Viatura {
   qr_code_token: string;
   is_forcada_recomendada?: boolean;
   km_proxima_revisao?: number;
+  data_proxima_revisao?: string;
   created_at: string;
 }
 

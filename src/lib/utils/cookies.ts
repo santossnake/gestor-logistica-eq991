@@ -56,8 +56,8 @@ export const getStoredMilitaryProfile = (): MilitaryProfile => {
   return { nip: '', nome: '', posto: '', email: '' };
 };
 
-// Local Fleet Overrides Persistence (for offline / mock refresh support)
-const FLEET_OVERRIDES_KEY = 'eq991_fleet_overrides_v1';
+// Local Fleet Overrides Persistence (v2 reset to enforce real KM values)
+const FLEET_OVERRIDES_KEY = 'eq991_fleet_overrides_v2';
 
 export function getFleetOverrides(): Record<string, any> {
   if (typeof window === 'undefined') return {};

@@ -22,7 +22,7 @@ import {
   Fuel,
   Building2,
   LocateFixed,
-  Check
+  Wrench
 } from 'lucide-react';
 import { supabase, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_GPS } from '@/lib/mock-data';
@@ -60,9 +60,11 @@ export default function AdminViaturasPage() {
   const [modelo, setModelo] = useState<string>('');
   const [numLugares, setNumLugares] = useState<number>(5);
   const [temGancho, setTemGancho] = useState<boolean>(true);
-  const [kmAtuais, setKmAtuais] = useState<number>(40000);
+  const [kmAtuais, setKmAtuais] = useState<number>(98620);
   const [localViatura, setLocalViatura] = useState<string>('Parque Principal EQ991 (Ota)');
   const [localChave, setLocalChave] = useState<string>('Chaveiro Principal - Armário A');
+  const [kmProximaRevisao, setKmProximaRevisao] = useState<number>(110000);
+  const [dataProximaRevisao, setDataProximaRevisao] = useState<string>('2026-11-15');
 
   // Refueling Modal for Logistics
   const [showRefuelModal, setShowRefuelModal] = useState<boolean>(false);
@@ -72,7 +74,7 @@ export default function AdminViaturasPage() {
   const [postoComercialNome, setPostoComercialNome] = useState<string>('');
   const [abastLitros, setAbastLitros] = useState<number>(50);
   const [abastValor, setAbastValor] = useState<number>(0);
-  const [abastKm, setAbastKm] = useState<number>(40000);
+  const [abastKm, setAbastKm] = useState<number>(98620);
   const [abastGpsLat, setAbastGpsLat] = useState<number | null>(null);
   const [abastGpsLng, setAbastGpsLng] = useState<number | null>(null);
 
@@ -84,7 +86,7 @@ export default function AdminViaturasPage() {
         const { data: vData } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
         let fleet: Viatura[] = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
 
-        // Apply local overrides for mock/refresh persistence
+        // Apply local overrides
         fleet = fleet.map((v) => {
           if (overrides[v.id]) {
             return { ...v, ...overrides[v.id] };
@@ -103,7 +105,7 @@ export default function AdminViaturasPage() {
     loadData();
   }, []);
 
-  // Filter GPS Points based on vehicle and date filters
+  // Filter GPS Points
   const pontosGpsFiltrados = todosPontosGps.filter((p) => {
     if (selectedViaturaId !== 'TODAS' && p.viatura_id !== selectedViaturaId) return false;
 
@@ -130,7 +132,6 @@ export default function AdminViaturasPage() {
     const prof = getStoredMilitaryProfile();
     const nowIso = new Date().toISOString();
 
-    // 1. Save local override immediately so refresh keeps it clean
     saveFleetOverride(v.id, {
       necessita_limpeza: false,
       data_ultima_limpeza: nowIso,
@@ -208,8 +209,8 @@ export default function AdminViaturasPage() {
 
       await supabase.from('registos_abastecimento').insert([refuelRec]);
 
-      // Update vehicle KM if higher
       if (abastKm > targetVtrForRefuel.km_atuais) {
+        saveFleetOverride(targetVtrForRefuel.id, { km_atuais: abastKm });
         await supabase.from('viaturas').update({ km_atuais: abastKm }).eq('id', targetVtrForRefuel.id);
         setViaturas((prev) =>
           prev.map((v) => (v.id === targetVtrForRefuel.id ? { ...v, km_atuais: abastKm } : v))
@@ -268,9 +269,11 @@ export default function AdminViaturasPage() {
     setModelo('Nissan Navara 4x4');
     setNumLugares(5);
     setTemGancho(true);
-    setKmAtuais(40000);
+    setKmAtuais(98620);
     setLocalViatura('Parque Principal EQ991 (Ota)');
     setLocalChave('Chaveiro Principal - Armário A');
+    setKmProximaRevisao(110000);
+    setDataProximaRevisao('2026-11-15');
     setIsModalOpen(true);
   };
 
@@ -283,12 +286,14 @@ export default function AdminViaturasPage() {
     setKmAtuais(v.km_atuais);
     setLocalViatura(v.localizacao_atual_viatura);
     setLocalChave(v.localizacao_atual_chave);
+    setKmProximaRevisao(v.km_proxima_revisao || v.km_atuais + 10000);
+    setDataProximaRevisao(v.data_proxima_revisao || '2026-11-15');
     setIsModalOpen(true);
   };
 
   const handleSaveViatura = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newToken = `VTR-991-${Math.floor(10 + Math.random() * 90)}`;
+    const newToken = editingViatura ? editingViatura.qr_code_token : `VTR-991-${Math.floor(10 + Math.random() * 90)}`;
 
     const vData = {
       matricula,
@@ -298,9 +303,13 @@ export default function AdminViaturasPage() {
       km_atuais: kmAtuais,
       localizacao_atual_viatura: localViatura,
       localizacao_atual_chave: localChave,
+      km_proxima_revisao: kmProximaRevisao,
+      data_proxima_revisao: dataProximaRevisao,
       latitude_atual: 39.0940,
       longitude_atual: -8.9670
     };
+
+    saveFleetOverride(editingViatura ? editingViatura.id : newToken, vData);
 
     try {
       if (editingViatura) {
@@ -312,8 +321,7 @@ export default function AdminViaturasPage() {
           estado: 'DISPONIVEL',
           necessita_limpeza: false,
           qr_code_token: newToken,
-          is_forcada_recomendada: false,
-          km_proxima_revisao: kmAtuais + 10000
+          is_forcada_recomendada: false
         };
         const { data } = await supabase.from('viaturas').insert([newRecord]).select();
         const created = data && data.length > 0 ? data[0] : { id: `vtr-${Date.now()}`, ...newRecord };
@@ -332,10 +340,10 @@ export default function AdminViaturasPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-100 uppercase tracking-wider flex items-center space-x-2">
             <Car className="w-5 h-5 text-emerald-400" />
-            <span>Gestão de Frota, Limpezas & Abastecimentos</span>
+            <span>Gestão de Frota, Manutenção, Limpezas & Abastecimentos</span>
           </h1>
           <p className="text-xs text-slate-400">
-            Esquadra 991. Gestão de viaturas, registo de limpezas efetuadas, abastecimentos e mapa de percursos.
+            Esquadra 991. Gestão de viaturas, definição da próxima manutenção (KM e Data), limpezas e abastecimentos.
           </p>
         </div>
 
@@ -523,10 +531,29 @@ export default function AdminViaturasPage() {
                 {/* Info List */}
                 <div className="space-y-1.5 text-xs text-slate-300 font-mono bg-slate-900/80 p-3 rounded-xl border border-slate-800">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Odómetro:</span>
-                    <span className="font-bold text-slate-100">{v.km_atuais.toLocaleString()} KM</span>
+                    <span className="text-slate-500">Odómetro Atual:</span>
+                    <span className="font-bold text-emerald-400">{v.km_atuais.toLocaleString()} KM</span>
                   </div>
-                  <div className="flex justify-between">
+
+                  {/* MAINTENANCE TARGET IN KM AND DATE */}
+                  <div className="flex justify-between border-t border-slate-800/80 pt-1">
+                    <span className="text-slate-500 flex items-center space-x-1">
+                      <Wrench className="w-3 h-3 text-amber-400" />
+                      <span>Próxima Manutenção:</span>
+                    </span>
+                    <span className="font-bold text-amber-300">
+                      {v.km_proxima_revisao ? v.km_proxima_revisao.toLocaleString() : (v.km_atuais + 10000).toLocaleString()} KM
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500">Data de Manutenção:</span>
+                    <span className="text-amber-300 font-semibold">
+                      {v.data_proxima_revisao ? new Date(v.data_proxima_revisao).toLocaleDateString() : '15/11/2026'}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between border-t border-slate-800/80 pt-1">
                     <span className="text-slate-500">Reboque:</span>
                     <span className={v.tem_gancho_reboque ? 'text-amber-400 font-bold' : 'text-slate-400'}>
                       {v.tem_gancho_reboque ? 'Sim (Com Gancho)' : 'Não'}
@@ -759,7 +786,7 @@ export default function AdminViaturasPage() {
         </div>
       )}
 
-      {/* CREATE / EDIT MODAL */}
+      {/* CREATE / EDIT MODAL WITH MAINTENANCE TARGET IN KM AND DATE */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="max-w-md w-full glass-panel p-6 rounded-2xl border border-slate-700 space-y-4 shadow-2xl">
@@ -769,7 +796,7 @@ export default function AdminViaturasPage() {
 
             <form onSubmit={handleSaveViatura} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-400 mb-1">Matrícula *</label>
+                <label className="block text-slate-400 mb-1 font-semibold">Matrícula *</label>
                 <input
                   type="text"
                   required
@@ -781,7 +808,7 @@ export default function AdminViaturasPage() {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Modelo da Viatura *</label>
+                <label className="block text-slate-400 mb-1 font-semibold">Modelo da Viatura *</label>
                 <input
                   type="text"
                   required
@@ -794,7 +821,7 @@ export default function AdminViaturasPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">Nº Lugares</label>
+                  <label className="block text-slate-400 mb-1 font-semibold">Nº Lugares</label>
                   <input
                     type="number"
                     value={numLugares}
@@ -804,13 +831,45 @@ export default function AdminViaturasPage() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Odómetro (KM)</label>
+                  <label className="block text-slate-400 mb-1 font-semibold">Odómetro Atual (KM) *</label>
                   <input
                     type="number"
                     value={kmAtuais}
                     onChange={(e) => setKmAtuais(parseInt(e.target.value, 10) || 0)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs font-bold text-emerald-400"
                   />
+                </div>
+              </div>
+
+              {/* MAINTENANCE TARGET IN KM AND DATE INPUTS */}
+              <div className="p-3 rounded-xl bg-slate-900/90 border border-amber-500/40 space-y-3">
+                <span className="text-amber-400 font-bold text-xs uppercase flex items-center space-x-1.5">
+                  <Wrench className="w-3.5 h-3.5" />
+                  <span>Definição da Próxima Manutenção</span>
+                </span>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1 text-[11px]">Próxima Manutenção (KM) *</label>
+                    <input
+                      type="number"
+                      required
+                      value={kmProximaRevisao}
+                      onChange={(e) => setKmProximaRevisao(parseInt(e.target.value, 10) || 0)}
+                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-amber-300 font-mono text-xs font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1 text-[11px]">Próxima Manutenção (Data) *</label>
+                    <input
+                      type="date"
+                      required
+                      value={dataProximaRevisao}
+                      onChange={(e) => setDataProximaRevisao(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-amber-300 font-mono text-xs"
+                    />
+                  </div>
                 </div>
               </div>
 
