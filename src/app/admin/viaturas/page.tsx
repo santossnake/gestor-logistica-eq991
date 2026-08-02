@@ -296,7 +296,7 @@ export default function AdminViaturasPage() {
     setTemGancho(true);
     setKmAtuais(98620);
     setLocalViatura('Parque Principal EQ991 (Ota)');
-    setLocalChave('Chaveiro Principal - Armário A');
+    setLocalChave('Chaveiro 991');
     setKmProximaRevisao(100000);
     setDataProximaRevisao('2027-08-02');
     setIsModalOpen(true);

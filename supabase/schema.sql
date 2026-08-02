@@ -184,17 +184,19 @@ INSERT INTO public.locais (nome, tipo, is_predefinido, is_ativo) VALUES
 ('Parque de Viaturas Pesadas', 'VIATURA', false, true),
 ('Posto de Abastecimento Base', 'VIATURA', false, true);
 
--- Locais Pré-definidos de Chaves
+-- Locais Predefinidos
 INSERT INTO public.locais (nome, tipo, is_predefinido, is_ativo) VALUES
-('Claviculário Principal - Armário A', 'CHAVE', true, true),
-('Corpo de Guarda - Receção', 'CHAVE', false, true),
-('Gabinete de Logística EQ991', 'CHAVE', false, true);
+('Parque Principal EQ991 (Ota)', 'VIATURA', true, true),
+('Parque Secundário (Plataforma Ota)', 'VIATURA', false, true),
+('Chaveiro 991', 'CHAVE', true, true),
+('Logística', 'CHAVE', false, true),
+('Oficial de Dia', 'CHAVE', false, true);
 
 -- Viaturas Exemplo Esquadra 991 (Frota Nissan Navara 4x4 com KM Reais e Manutenção Atualizada)
 INSERT INTO public.viaturas (matricula, modelo, num_lugares, tem_gancho_reboque, km_atuais, estado, necessita_limpeza, localizacao_atual_viatura, localizacao_atual_chave, latitude_atual, longitude_atual, qr_code_token, is_forcada_recomendada, km_proxima_revisao, data_proxima_revisao) VALUES
-('AM-96-11', 'Nissan Navara 4x4', 5, true, 98620, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro Principal - Armário A', 39.0940, -8.9670, 'VTR-991-01', true, 100000, '2027-08-02'),
-('AM-96-12', 'Nissan Navara 4x4', 5, true, 105888, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro Principal - Armário A', 39.0945, -8.9675, 'VTR-991-02', false, 110000, '2027-08-02'),
-('AM-96-13', 'Nissan Navara 4x4', 5, true, 102614, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro Principal - Armário A', 39.0935, -8.9665, 'VTR-991-03', false, 110000, '2027-08-02');
+('AM-96-11', 'Nissan Navara 4x4', 5, true, 98620, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro 991', 39.0940, -8.9670, 'VTR-991-01', true, 100000, '2027-08-02'),
+('AM-96-12', 'Nissan Navara 4x4', 5, true, 105888, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro 991', 39.0945, -8.9675, 'VTR-991-02', false, 110000, '2027-08-02'),
+('AM-96-13', 'Nissan Navara 4x4', 5, true, 102614, 'DISPONIVEL', false, 'Parque Principal EQ991 (Ota)', 'Chaveiro 991', 39.0935, -8.9665, 'VTR-991-03', false, 110000, '2027-08-02');
 
 -- Add maintenance date column if not exists
 ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS data_proxima_revisao TIMESTAMP WITH TIME ZONE;
