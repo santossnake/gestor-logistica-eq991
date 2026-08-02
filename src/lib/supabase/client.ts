@@ -12,18 +12,36 @@ export interface Viatura {
   num_lugares: number;
   tem_gancho_reboque: boolean;
   km_atuais: number;
-  estado: 'DISPONIVEL' | 'EM_USO' | 'EMPRESTADA_EXTERNO' | 'MANUTENCAO';
+  estado: 'DISPONIVEL' | 'EM_USO' | 'MANUTENCAO' | 'EMPRESTADA_EXTERNO';
   necessita_limpeza: boolean;
+  data_ultima_limpeza?: string;
+  limpo_por_nip?: string;
   localizacao_atual_viatura: string;
   localizacao_atual_chave: string;
-  latitude_atual?: number;
-  longitude_atual?: number;
+  latitude_atual: number;
+  longitude_atual: number;
   fonte_ultima_localizacao?: string;
   ultima_localizacao_at?: string;
   qr_code_token: string;
   is_forcada_recomendada?: boolean;
   km_proxima_revisao?: number;
-  created_at?: string;
+  created_at: string;
+}
+
+export interface RegistoAbastecimento {
+  id: string;
+  viatura_id: string;
+  registo_marcha_id?: string;
+  nip_responsavel: string;
+  tipo_abastecimento: 'UNIDADE_MILITAR' | 'POSTO_COMERCIAL';
+  unidade_militar?: string;
+  posto_comercial_nome?: string;
+  latitude_posto?: number;
+  longitude_posto?: number;
+  litros: number;
+  valor_euros?: number;
+  km_no_abastecimento: number;
+  registado_at: string;
 }
 
 export interface LocalItem {

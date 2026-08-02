@@ -18,12 +18,29 @@ import {
   Route,
   Navigation,
   Clock,
-  User
+  User,
+  Fuel,
+  Building2,
+  LocateFixed,
+  Check
 } from 'lucide-react';
-import { supabase, Viatura, HistoricoGps } from '@/lib/supabase/client';
+import { supabase, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_GPS } from '@/lib/mock-data';
+import { getStoredMilitaryProfile } from '@/lib/utils/cookies';
 
 const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false });
+
+const UNIDADES_FORCA_AEREA = [
+  'BA2 - Ota (Unidade Base)',
+  'BA1 - Sintra (Granja do Marquês)',
+  'BA4 - Lajes (Terceira, Açores)',
+  'BA5 - Monte Real',
+  'BA6 - Montijo',
+  'BA11 - Beja',
+  'AT1 - Lisboa (Figo Maduro)',
+  'AM1 - Porto Santo',
+  'Outra Unidade Militar...'
+];
 
 export default function AdminViaturasPage() {
   const [viaturas, setViaturas] = useState<Viatura[]>(MOCK_VIATURAS);
@@ -32,7 +49,7 @@ export default function AdminViaturasPage() {
 
   // Filters for Route Map
   const [selectedViaturaId, setSelectedViaturaId] = useState<string>('TODAS');
-  const [filtroData, setFiltroData] = useState<string>('HOJE'); // HOJE, 7DIAS, 30DIAS, CUSTOM
+  const [filtroData, setFiltroData] = useState<string>('HOJE');
   const [customData, setCustomData] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Form Modal for Create / Edit
@@ -46,6 +63,18 @@ export default function AdminViaturasPage() {
   const [kmAtuais, setKmAtuais] = useState<number>(40000);
   const [localViatura, setLocalViatura] = useState<string>('Parque Principal EQ991 (Ota)');
   const [localChave, setLocalChave] = useState<string>('Chaveiro Principal - Armário A');
+
+  // Refueling Modal for Logistics
+  const [showRefuelModal, setShowRefuelModal] = useState<boolean>(false);
+  const [targetVtrForRefuel, setTargetVtrForRefuel] = useState<Viatura | null>(null);
+  const [tipoAbastecimento, setTipoAbastecimento] = useState<'UNIDADE_MILITAR' | 'POSTO_COMERCIAL'>('UNIDADE_MILITAR');
+  const [unidadeMilitar, setUnidadeMilitar] = useState<string>('BA2 - Ota (Unidade Base)');
+  const [postoComercialNome, setPostoComercialNome] = useState<string>('');
+  const [abastLitros, setAbastLitros] = useState<number>(50);
+  const [abastValor, setAbastValor] = useState<number>(0);
+  const [abastKm, setAbastKm] = useState<number>(40000);
+  const [abastGpsLat, setAbastGpsLat] = useState<number | null>(null);
+  const [abastGpsLng, setAbastGpsLng] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -64,32 +93,116 @@ export default function AdminViaturasPage() {
 
   // Filter GPS Points based on vehicle and date filters
   const pontosGpsFiltrados = todosPontosGps.filter((p) => {
-    // 1. Vehicle Filter
-    if (selectedViaturaId !== 'TODAS' && p.viatura_id !== selectedViaturaId) {
-      return false;
-    }
+    if (selectedViaturaId !== 'TODAS' && p.viatura_id !== selectedViaturaId) return false;
 
-    // 2. Date Filter
     const pDate = new Date(p.registado_at);
     const now = new Date();
 
     if (filtroData === 'HOJE') {
       return pDate.toDateString() === now.toDateString();
     } else if (filtroData === '7DIAS') {
-      const diffTime = now.getTime() - pDate.getTime();
-      const diffDays = diffTime / (1000 * 3600 * 24);
+      const diffDays = (now.getTime() - pDate.getTime()) / (1000 * 3600 * 24);
       return diffDays <= 7;
     } else if (filtroData === '30DIAS') {
-      const diffTime = now.getTime() - pDate.getTime();
-      const diffDays = diffTime / (1000 * 3600 * 24);
+      const diffDays = (now.getTime() - pDate.getTime()) / (1000 * 3600 * 24);
       return diffDays <= 30;
     } else if (filtroData === 'CUSTOM' && customData) {
-      const targetDateStr = new Date(customData).toDateString();
-      return pDate.toDateString() === targetDateStr;
+      return pDate.toDateString() === new Date(customData).toDateString();
     }
 
     return true;
   });
+
+  // Action: Mark Cleaning Done
+  const handleMarkCleaned = async (v: Viatura) => {
+    const prof = getStoredMilitaryProfile();
+    const nowIso = new Date().toISOString();
+
+    try {
+      await supabase
+        .from('viaturas')
+        .update({
+          necessita_limpeza: false,
+          data_ultima_limpeza: nowIso,
+          limpo_por_nip: prof.nip || 'LOGÍSTICA'
+        })
+        .eq('id', v.id);
+
+      setViaturas((prev) =>
+        prev.map((item) =>
+          item.id === v.id
+            ? { ...item, necessita_limpeza: false, data_ultima_limpeza: nowIso, limpo_por_nip: prof.nip || 'LOGÍSTICA' }
+            : item
+        )
+      );
+
+      alert(`Limpeza registada com sucesso na viatura ${v.matricula}!`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Action: Save Refuel for Logistics
+  const handleOpenRefuelModal = (v: Viatura) => {
+    setTargetVtrForRefuel(v);
+    setAbastKm(v.km_atuais);
+    setShowRefuelModal(true);
+  };
+
+  const handleCaptureGpsLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setAbastGpsLat(pos.coords.latitude);
+          setAbastGpsLng(pos.coords.longitude);
+          alert(`Posição GPS capturada: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+        },
+        () => {
+          setAbastGpsLat(39.094);
+          setAbastGpsLng(-8.967);
+          alert('Localização registada na Base da Ota (39.094, -8.967).');
+        }
+      );
+    }
+  };
+
+  const handleSaveLogisticsRefuel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetVtrForRefuel) return;
+
+    const prof = getStoredMilitaryProfile();
+
+    try {
+      const refuelRec = {
+        viatura_id: targetVtrForRefuel.id,
+        nip_responsavel: prof.nip || 'LOGÍSTICA',
+        tipo_abastecimento: tipoAbastecimento,
+        unidade_militar: tipoAbastecimento === 'UNIDADE_MILITAR' ? unidadeMilitar : null,
+        posto_comercial_nome: tipoAbastecimento === 'POSTO_COMERCIAL' ? postoComercialNome || 'Posto Comercial' : null,
+        latitude_posto: abastGpsLat || targetVtrForRefuel.latitude_atual || 39.094,
+        longitude_posto: abastGpsLng || targetVtrForRefuel.longitude_atual || -8.967,
+        litros: abastLitros,
+        valor_euros: abastValor,
+        km_no_abastecimento: abastKm,
+        registado_at: new Date().toISOString()
+      };
+
+      await supabase.from('registos_abastecimento').insert([refuelRec]);
+
+      // Update vehicle KM if higher
+      if (abastKm > targetVtrForRefuel.km_atuais) {
+        await supabase.from('viaturas').update({ km_atuais: abastKm }).eq('id', targetVtrForRefuel.id);
+        setViaturas((prev) =>
+          prev.map((v) => (v.id === targetVtrForRefuel.id ? { ...v, km_atuais: abastKm } : v))
+        );
+      }
+
+      alert(`Abastecimento de ${abastLitros}L registado na viatura ${targetVtrForRefuel.matricula}!`);
+      setShowRefuelModal(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleCopyLink = (qrToken: string) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -103,7 +216,6 @@ export default function AdminViaturasPage() {
     const newStatus = !v.is_forcada_recomendada;
     try {
       if (newStatus) {
-        // Reset all others to false
         await supabase.from('viaturas').update({ is_forcada_recomendada: false }).neq('id', v.id);
       }
       await supabase.from('viaturas').update({ is_forcada_recomendada: newStatus }).eq('id', v.id);
@@ -167,8 +279,8 @@ export default function AdminViaturasPage() {
       km_atuais: kmAtuais,
       localizacao_atual_viatura: localViatura,
       localizacao_atual_chave: localChave,
-      latitude_atual: 39.1090,
-      longitude_atual: -8.9735
+      latitude_atual: 39.0940,
+      longitude_atual: -8.9670
     };
 
     try {
@@ -201,10 +313,10 @@ export default function AdminViaturasPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-100 uppercase tracking-wider flex items-center space-x-2">
             <Car className="w-5 h-5 text-emerald-400" />
-            <span>Gestão de Frota & Percursos das Viaturas</span>
+            <span>Gestão de Frota, Limpezas & Abastecimentos</span>
           </h1>
           <p className="text-xs text-slate-400">
-            Esquadra 991. Gestão de viaturas, recomendação manual, atalhos de chave e histórico de percursos no mapa.
+            Esquadra 991. Gestão de viaturas, registo de limpezas efetuadas, abastecimentos e mapa de percursos.
           </p>
         </div>
 
@@ -226,17 +338,16 @@ export default function AdminViaturasPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
-                Mapa de Movimentos & Percursos GPS (Ota)
+                Mapa de Movimentos & Percursos GPS (Ota: 39.094, -8.967)
               </h2>
               <p className="text-[11px] text-slate-400">
-                Visualize os percursos e registos de marcha por viatura e intervalo de datas.
+                Visualize os percursos por viatura e intervalo de datas.
               </p>
             </div>
           </div>
 
           {/* Filters Bar */}
           <div className="flex flex-wrap items-center gap-3 text-xs">
-            {/* Vehicle Selector */}
             <div className="flex items-center space-x-1 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-700">
               <Car className="w-3.5 h-3.5 text-emerald-400" />
               <span className="text-slate-400 font-mono text-[11px]">Viatura:</span>
@@ -254,7 +365,6 @@ export default function AdminViaturasPage() {
               </select>
             </div>
 
-            {/* Date Quick Selector */}
             <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-700 font-mono">
               <button
                 onClick={() => setFiltroData('HOJE')}
@@ -301,7 +411,6 @@ export default function AdminViaturasPage() {
           </div>
         </div>
 
-        {/* Route Map */}
         <div className="rounded-xl overflow-hidden border border-slate-800">
           <RouteMap pontosGps={pontosGpsFiltrados} />
         </div>
@@ -364,6 +473,34 @@ export default function AdminViaturasPage() {
                   </span>
                 </div>
 
+                {/* CLEANING WARNING BADGE */}
+                {v.necessita_limpeza ? (
+                  <div className="p-2.5 rounded-lg bg-amber-950/90 border border-amber-500/60 text-amber-200 text-xs font-bold flex items-center justify-between">
+                    <div className="flex items-center space-x-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>🧼 NECESSITA DE LIMPEZA</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkCleaned(v);
+                      }}
+                      className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] uppercase shadow"
+                    >
+                      Marcar Limpo
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 text-[11px] font-mono flex items-center justify-between">
+                    <span>✨ Limpeza em dia</span>
+                    {v.data_ultima_limpeza && (
+                      <span className="text-[10px] text-slate-500">
+                        {new Date(v.data_ultima_limpeza).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Info List */}
                 <div className="space-y-1.5 text-xs text-slate-300 font-mono bg-slate-900/80 p-3 rounded-xl border border-slate-800">
                   <div className="flex justify-between">
@@ -386,8 +523,20 @@ export default function AdminViaturasPage() {
                   </div>
                 </div>
 
+                {/* LOGISTICS REFUEL BUTTON */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenRefuelModal(v);
+                  }}
+                  className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center space-x-2 transition-all"
+                >
+                  <Fuel className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Registar Abastecimento (Logística)</span>
+                </button>
+
                 {/* Forced recommendation toggle button */}
-                <div className="pt-1">
+                <div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -414,7 +563,6 @@ export default function AdminViaturasPage() {
                       handleCopyLink(v.qr_code_token);
                     }}
                     className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-emerald-400 flex items-center space-x-1 border border-slate-700 transition-colors"
-                    title="Copiar link direto para programar Tag NFC ou QR Code"
                   >
                     <LinkIcon className="w-3.5 h-3.5" />
                     <span>{copiedToken === v.qr_code_token ? 'Link Copiado!' : 'Copiar Link NFC'}</span>
@@ -427,7 +575,6 @@ export default function AdminViaturasPage() {
                         handleOpenEditModal(v);
                       }}
                       className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700"
-                      title="Editar Viatura"
                     >
                       <Edit className="w-3.5 h-3.5" />
                     </button>
@@ -437,7 +584,6 @@ export default function AdminViaturasPage() {
                         handleDeleteViatura(v.id);
                       }}
                       className="p-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800"
-                      title="Apagar Viatura"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -448,6 +594,151 @@ export default function AdminViaturasPage() {
           })}
         </div>
       </div>
+
+      {/* MODAL: LOGISTICS REFUELING */}
+      {showRefuelModal && targetVtrForRefuel && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full glass-panel p-6 rounded-2xl border-2 border-emerald-500/60 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2 text-emerald-400 font-bold uppercase tracking-wider text-sm">
+                <Fuel className="w-5 h-5" />
+                <span>Registar Abastecimento: {targetVtrForRefuel.matricula}</span>
+              </div>
+              <button onClick={() => setShowRefuelModal(false)} className="text-slate-400 hover:text-white text-xs font-bold">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveLogisticsRefuel} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Tipo de Abastecimento *</label>
+                <div className="grid grid-cols-2 gap-2 font-mono font-bold text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setTipoAbastecimento('UNIDADE_MILITAR')}
+                    className={`py-2 px-3 rounded-lg border text-center flex items-center justify-center space-x-1.5 transition-all ${
+                      tipoAbastecimento === 'UNIDADE_MILITAR'
+                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
+                        : 'bg-slate-900 text-slate-400 border-slate-800'
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>Unidade Militar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTipoAbastecimento('POSTO_COMERCIAL')}
+                    className={`py-2 px-3 rounded-lg border text-center flex items-center justify-center space-x-1.5 transition-all ${
+                      tipoAbastecimento === 'POSTO_COMERCIAL'
+                        ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                        : 'bg-slate-900 text-slate-400 border-slate-800'
+                    }`}
+                  >
+                    <Fuel className="w-3.5 h-3.5" />
+                    <span>Bombas Comerciais</span>
+                  </button>
+                </div>
+              </div>
+
+              {tipoAbastecimento === 'UNIDADE_MILITAR' ? (
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Unidade de Combustível da Força Aérea *</label>
+                  <select
+                    value={unidadeMilitar}
+                    onChange={(e) => setUnidadeMilitar(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold"
+                  >
+                    {UNIDADES_FORCA_AEREA.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-semibold">Nome / Identificação da Bomba Comercial *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Galp Ota, BP Carregado, Repsol A1"
+                      value={postoComercialNome}
+                      onChange={(e) => setPostoComercialNome(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCaptureGpsLocation}
+                    className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-blue-500/40 text-blue-300 font-bold text-xs flex items-center justify-center space-x-2 transition-colors"
+                  >
+                    <LocateFixed className="w-4 h-4 text-blue-400" />
+                    <span>
+                      {abastGpsLat ? `GPS Capturado (${abastGpsLat.toFixed(4)}, ${abastGpsLng?.toFixed(4)})` : 'Capturar Posição GPS Atual do Posto'}
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Litros Abastecidos *</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.1"
+                    value={abastLitros}
+                    onChange={(e) => setAbastLitros(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono text-emerald-400 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Valor Total (€)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Ex: 85.50"
+                    value={abastValor || ''}
+                    onChange={(e) => setAbastValor(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Quilómetros no Momento (Odómetro) *</label>
+                <input
+                  type="number"
+                  required
+                  value={abastKm}
+                  onChange={(e) => setAbastKm(parseInt(e.target.value, 10) || 0)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono text-amber-400 font-bold"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRefuelModal(false)}
+                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase shadow-lg shadow-emerald-950"
+                >
+                  Guardar Abastecimento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* CREATE / EDIT MODAL */}
       {isModalOpen && (

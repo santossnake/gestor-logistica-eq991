@@ -24,7 +24,9 @@ import {
   Navigation,
   Info,
   Wrench,
-  Siren
+  Siren,
+  Building2,
+  LocateFixed
 } from 'lucide-react';
 import { getStoredMilitaryProfile, saveMilitaryProfile, MilitaryProfile } from '@/lib/utils/cookies';
 import { supabase, Viatura, LocalItem, RegistoMarcha } from '@/lib/supabase/client';
@@ -34,12 +36,23 @@ import { OdometerScanner } from '@/components/OdometerScanner';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
+const UNIDADES_FORCA_AEREA = [
+  'BA2 - Ota (Unidade Base)',
+  'BA1 - Sintra (Granja do Marquês)',
+  'BA4 - Lajes (Terceira, Açores)',
+  'BA5 - Monte Real',
+  'BA6 - Montijo',
+  'BA11 - Beja',
+  'AT1 - Lisboa (Figo Maduro)',
+  'AM1 - Porto Santo',
+  'Outra Unidade Militar...'
+];
+
 export default function ChavePage() {
   const params = useParams();
   const router = useRouter();
   const qrToken = (params?.qr_token as string) || '';
 
-  // Synchronous initial vehicle lookup to eliminate waiting screen
   const initialV = MOCK_VIATURAS.find((item) => item.qr_code_token === qrToken) || MOCK_VIATURAS[0];
 
   const [viatura, setViatura] = useState<Viatura>(initialV);
@@ -61,20 +74,30 @@ export default function ChavePage() {
   const [valorEuros, setValorEuros] = useState<number>(0);
   const [locChaveSelected, setLocChaveSelected] = useState<string>('Chaveiro Principal - Armário A');
   const [locViaturaSelected, setLocViaturaSelected] = useState<string>('Parque Principal EQ991 (Ota)');
-  const [locChaveOutro, setLocChaveOutro] = useState<string>('');
-  const [locViaturaOutro, setLocViaturaOutro] = useState<string>('');
 
   const [checkDocs, setCheckDocs] = useState<boolean>(true);
   const [checkCartao, setCheckCartao] = useState<boolean>(true);
   const [checkSeguranca, setCheckSeguranca] = useState<boolean>(true);
   const [necessitaLimpeza, setNecessitaLimpeza] = useState<boolean>(initialV.necessita_limpeza || false);
 
-  // Anomalia / Incidente em marcha Modal
+  // Anomalia Modal
   const [showReportIssueModal, setShowReportIssueModal] = useState<boolean>(false);
   const [tipoAnomalia, setTipoAnomalia] = useState<string>('Luz de Manutenção / Avaria no Painel');
   const [descricaoAnomalia, setDescricaoAnomalia] = useState<string>('');
   const [gravidadeAnomalia, setGravidadeAnomalia] = useState<'LEVE' | 'MODERADA' | 'GRAVE'>('MODERADA');
   const [issueReportedSuccess, setIssueReportedSuccess] = useState<boolean>(false);
+
+  // Abastecimento Modal (Unidade / Posto Comercial)
+  const [showRefuelModal, setShowRefuelModal] = useState<boolean>(false);
+  const [tipoAbastecimento, setTipoAbastecimento] = useState<'UNIDADE_MILITAR' | 'POSTO_COMERCIAL'>('UNIDADE_MILITAR');
+  const [unidadeMilitar, setUnidadeMilitar] = useState<string>('BA2 - Ota (Unidade Base)');
+  const [postoComercialNome, setPostoComercialNome] = useState<string>('');
+  const [abastLitros, setAbastLitros] = useState<number>(45);
+  const [abastValor, setAbastValor] = useState<number>(0);
+  const [abastKm, setAbastKm] = useState<number>(initialV.km_atuais);
+  const [abastGpsLat, setAbastGpsLat] = useState<number | null>(null);
+  const [abastGpsLng, setAbastGpsLng] = useState<number | null>(null);
+  const [refuelSuccess, setRefuelSuccess] = useState<boolean>(false);
 
   // UI state
   const [activeTab, setActiveTab] = useState<'INICIAR' | 'ALTERNAR' | 'FINALIZAR'>('INICIAR');
@@ -92,6 +115,7 @@ export default function ChavePage() {
           setViatura(vData);
           setKmInicialInput(vData.km_atuais);
           setKmFinalInput(vData.km_atuais);
+          setAbastKm(vData.km_atuais);
           setNecessitaLimpeza(vData.necessita_limpeza);
         }
 
@@ -135,6 +159,60 @@ export default function ChavePage() {
     }
   }, [qrToken]);
 
+  // Capture GPS location for Refueling Station
+  const handleCaptureGpsLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setAbastGpsLat(pos.coords.latitude);
+          setAbastGpsLng(pos.coords.longitude);
+          alert(`Posição GPS capturada com sucesso: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+        },
+        () => {
+          setAbastGpsLat(39.094);
+          setAbastGpsLng(-8.967);
+          alert('Localização aproximada registada na Base da Ota (39.094, -8.967).');
+        }
+      );
+    }
+  };
+
+  // Handler: Save Refueling Record
+  const handleSaveRefuel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile.nip) {
+      alert('Por favor introduza o seu NIP.');
+      return;
+    }
+
+    try {
+      const refuelRec = {
+        viatura_id: viatura.id,
+        registo_marcha_id: marchaAtiva?.id,
+        nip_responsavel: profile.nip,
+        tipo_abastecimento: tipoAbastecimento,
+        unidade_militar: tipoAbastecimento === 'UNIDADE_MILITAR' ? unidadeMilitar : null,
+        posto_comercial_nome: tipoAbastecimento === 'POSTO_COMERCIAL' ? postoComercialNome || 'Posto Comercial Externo' : null,
+        latitude_posto: abastGpsLat || viatura.latitude_atual || 39.094,
+        longitude_posto: abastGpsLng || viatura.longitude_atual || -8.967,
+        litros: abastLitros,
+        valor_euros: abastValor,
+        km_no_abastecimento: abastKm,
+        registado_at: new Date().toISOString()
+      };
+
+      await supabase.from('registos_abastecimento').insert([refuelRec]);
+
+      setRefuelSuccess(true);
+      setTimeout(() => {
+        setRefuelSuccess(false);
+        setShowRefuelModal(false);
+      }, 2000);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Handler: Report In-Trip Issue
   const handleReportIssue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,13 +233,11 @@ export default function ChavePage() {
         }
       ]);
 
-      // If GRAVE anomaly, update vehicle to MANUTENCAO
       if (gravidadeAnomalia === 'GRAVE') {
         await supabase.from('viaturas').update({ estado: 'MANUTENCAO' }).eq('id', viatura.id);
         setViatura({ ...viatura, estado: 'MANUTENCAO' });
       }
 
-      // Log GPS event
       await supabase.from('historico_posicoes_gps').insert([
         {
           viatura_id: viatura.id,
@@ -256,8 +332,8 @@ export default function ChavePage() {
     saveMilitaryProfile(profile);
     setErrorMsg('');
 
-    const finalKeyLoc = locChaveSelected === 'Outro...' ? locChaveOutro : locChaveSelected;
-    const finalVtrLoc = locViaturaSelected === 'Outro...' ? locViaturaOutro : locViaturaSelected;
+    const finalKeyLoc = locChaveSelected;
+    const finalVtrLoc = locViaturaSelected;
 
     try {
       if (marchaAtiva) {
@@ -341,7 +417,7 @@ export default function ChavePage() {
           </div>
         </div>
 
-        {/* PROMINENT CLEANING BADGE IF NEEDED */}
+        {/* Cleaning Badge */}
         {viatura.necessita_limpeza && (
           <div className="p-3 rounded-lg bg-amber-950/90 border border-amber-500/60 text-amber-200 text-xs flex items-center space-x-2 font-bold animate-in fade-in">
             <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
@@ -350,24 +426,21 @@ export default function ChavePage() {
         )}
       </div>
 
-      {/* REPORT ISSUE IN TRIP BUTTON (EMERGENCY / MAINTENANCE LIGHT) */}
-      <div className="p-4 rounded-xl bg-rose-950/40 border-2 border-rose-500/50 flex items-center justify-between gap-3 shadow-lg">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 flex-shrink-0">
-            <Siren className="w-6 h-6 animate-pulse" />
-          </div>
-          <div>
-            <span className="font-mono font-bold text-xs text-rose-400 block uppercase">ALERTAS DE SEGURANÇA</span>
-            <h3 className="text-xs font-bold text-slate-100">Acendeu Luz de Manutenção ou Avaria?</h3>
-            <p className="text-[11px] text-slate-400">Reporte anomalias em marcha de imediato à Logística.</p>
-          </div>
-        </div>
+      {/* QUICK ACTIONS BAR: REFUEL + REPORT ISSUE */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setShowRefuelModal(true)}
+          className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center space-x-2 shadow-lg transition-all group"
+        >
+          <Fuel className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+          <span>Registar Abastecimento</span>
+        </button>
 
         <button
           onClick={() => setShowReportIssueModal(true)}
-          className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase flex items-center space-x-1.5 shadow-md shadow-rose-950 transition-all flex-shrink-0"
+          className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center justify-center space-x-2 shadow-lg transition-all group"
         >
-          <AlertTriangle className="w-4 h-4" />
+          <AlertTriangle className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
           <span>Reportar Problema</span>
         </button>
       </div>
@@ -654,7 +727,167 @@ export default function ChavePage() {
         </div>
       )}
 
-      {/* MODAL: REPORT IN-TRIP ISSUE / MAINTENANCE LIGHT */}
+      {/* MODAL: REFUELING REGISTRATION (UNIDADE MILITAR vs POSTO COMERCIAL GPS) */}
+      {showRefuelModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full glass-panel p-6 rounded-2xl border-2 border-emerald-500/60 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2 text-emerald-400 font-bold uppercase tracking-wider text-sm">
+                <Fuel className="w-5 h-5" />
+                <span>Registar Abastecimento de Combustível</span>
+              </div>
+              <button
+                onClick={() => setShowRefuelModal(false)}
+                className="text-slate-400 hover:text-white text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {refuelSuccess ? (
+              <div className="p-4 rounded-xl bg-emerald-950 border border-emerald-500 text-emerald-200 text-center space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                <p className="font-bold text-sm">Abastecimento Registado com Sucesso!</p>
+                <p className="text-xs text-emerald-300">Os litros e odómetro foram atualizados na Logística.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveRefuel} className="space-y-4 text-xs">
+                {/* Refuel Type Tabs */}
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Tipo de Abastecimento *</label>
+                  <div className="grid grid-cols-2 gap-2 font-mono font-bold text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setTipoAbastecimento('UNIDADE_MILITAR')}
+                      className={`py-2 px-3 rounded-lg border text-center flex items-center justify-center space-x-1.5 transition-all ${
+                        tipoAbastecimento === 'UNIDADE_MILITAR'
+                          ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
+                          : 'bg-slate-900 text-slate-400 border-slate-800'
+                      }`}
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span>Unidade Militar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTipoAbastecimento('POSTO_COMERCIAL')}
+                      className={`py-2 px-3 rounded-lg border text-center flex items-center justify-center space-x-1.5 transition-all ${
+                        tipoAbastecimento === 'POSTO_COMERCIAL'
+                          ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                          : 'bg-slate-900 text-slate-400 border-slate-800'
+                      }`}
+                    >
+                      <Fuel className="w-3.5 h-3.5" />
+                      <span>Bombas Comerciais</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conditional Fields: UNIDADE MILITAR */}
+                {tipoAbastecimento === 'UNIDADE_MILITAR' ? (
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-semibold">Unidade de Combustível da Força Aérea *</label>
+                    <select
+                      value={unidadeMilitar}
+                      onChange={(e) => setUnidadeMilitar(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold"
+                    >
+                      {UNIDADES_FORCA_AEREA.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  /* Conditional Fields: POSTO COMERCIAL */
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-semibold">Nome / Identificação da Bomba Comercial *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Galp Ota, BP Carregado, Repsol A1"
+                        value={postoComercialNome}
+                        onChange={(e) => setPostoComercialNome(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleCaptureGpsLocation}
+                      className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-blue-500/40 text-blue-300 font-bold text-xs flex items-center justify-center space-x-2 transition-colors"
+                    >
+                      <LocateFixed className="w-4 h-4 text-blue-400" />
+                      <span>
+                        {abastGpsLat ? `GPS Capturado (${abastGpsLat.toFixed(4)}, ${abastGpsLng?.toFixed(4)})` : 'Capturar Posição GPS Atual do Posto'}
+                      </span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Common Fields: Litros, Valor, KM */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-semibold">Litros Abastecidos *</label>
+                    <input
+                      type="number"
+                      required
+                      step="0.1"
+                      value={abastLitros}
+                      onChange={(e) => setAbastLitros(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono text-emerald-400 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-semibold">Valor Total (€)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Ex: 85.50"
+                      value={abastValor || ''}
+                      onChange={(e) => setAbastValor(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Quilómetros no Momento (Odómetro) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={abastKm}
+                    onChange={(e) => setAbastKm(parseInt(e.target.value, 10) || 0)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono text-amber-400 font-bold"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowRefuelModal(false)}
+                    className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase shadow-lg shadow-emerald-950"
+                  >
+                    Guardar Abastecimento
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REPORT IN-TRIP ISSUE */}
       {showReportIssueModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
           <div className="max-w-md w-full glass-panel p-6 rounded-2xl border-2 border-rose-500/60 space-y-4 shadow-2xl animate-in zoom-in-95">

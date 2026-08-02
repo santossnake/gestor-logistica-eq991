@@ -196,6 +196,34 @@ INSERT INTO public.viaturas (matricula, modelo, num_lugares, tem_gancho_reboque,
 ('AM-96-12', 'Nissan Navara 4x4', 5, true, 38400, 'DISPONIVEL', false, 'Parque Principal EQ991', 'Chaveiro Principal - Armário A', 38.8315, -9.3385, 'VTR-991-02', false, 50000),
 ('AM-96-13', 'Nissan Navara 4x4', 5, true, 35100, 'DISPONIVEL', false, 'Parque Principal EQ991', 'Chaveiro Principal - Armário A', 38.8315, -9.3385, 'VTR-991-03', false, 50000);
 
+-- Add cleaning columns to viaturas if not exists
+ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS data_ultima_limpeza TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS limpo_por_nip TEXT;
+
+-- -------------------------------------------------------
+-- 11. TABELA: registos_abastecimento (Abastecimentos Unidade / Bombas Comerciais)
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.registos_abastecimento (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    viatura_id UUID REFERENCES public.viaturas(id) ON DELETE CASCADE,
+    registo_marcha_id UUID REFERENCES public.registos_marcha(id) ON DELETE SET NULL,
+    nip_responsavel TEXT NOT NULL,
+    tipo_abastecimento TEXT CHECK (tipo_abastecimento IN ('UNIDADE_MILITAR', 'POSTO_COMERCIAL')) NOT NULL,
+    unidade_militar TEXT,
+    posto_comercial_nome TEXT,
+    latitude_posto DOUBLE PRECISION,
+    longitude_posto DOUBLE PRECISION,
+    litros NUMERIC(8,2) NOT NULL,
+    valor_euros NUMERIC(8,2),
+    km_no_abastecimento INTEGER NOT NULL,
+    registado_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.registos_abastecimento ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Acesso Total aos Abastecimentos" ON public.registos_abastecimento
+    FOR ALL USING (true) WITH CHECK (true);
+
 -- -------------------------------------------------------
 -- 10. TABELA: utilizadores_logistica (Gestores de Logística com Trigrama)
 -- -------------------------------------------------------
