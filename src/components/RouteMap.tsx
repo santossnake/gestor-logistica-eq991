@@ -16,16 +16,16 @@ export default function RouteMap({ pontosGps }: RouteMapProps) {
 
   if (!mounted) {
     return (
-      <div className="w-full h-96 rounded-xl bg-slate-900 flex items-center justify-center text-slate-500 text-sm">
-        A carregar mapa de percurso...
+      <div className="w-full h-96 rounded-xl bg-slate-900 flex items-center justify-center text-slate-500 text-sm font-mono">
+        A carregar mapa de percurso (Base Aérea da Ota)...
       </div>
     );
   }
 
   if (!pontosGps || pontosGps.length === 0) {
     return (
-      <div className="w-full h-96 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 text-sm">
-        Sem dados de coordenadas GPS para o filtro selecionado.
+      <div className="w-full h-96 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 text-sm font-mono">
+        Sem dados de coordenadas GPS para o filtro selecionado na zona da Ota.
       </div>
     );
   }
@@ -34,7 +34,8 @@ export default function RouteMap({ pontosGps }: RouteMapProps) {
   const L = require('leaflet');
 
   const positions: [number, number][] = pontosGps.map((p) => [p.latitude, p.longitude]);
-  const centerPos = positions[0] || [38.8315, -9.3385];
+  // Default fallback center: Base Aérea da Ota
+  const centerPos = positions[0] || [39.1090, -8.9735];
 
   const getEventIcon = (tipo: string) => {
     let color = '#22c55e'; // Green for start
@@ -45,9 +46,9 @@ export default function RouteMap({ pontosGps }: RouteMapProps) {
 
     return L.divIcon({
       className: 'event-pin',
-      html: `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 6px ${color};"></div>`,
-      iconSize: [14, 14],
-      iconAnchor: [7, 7]
+      html: `<div style="background-color: ${color}; width: 16px; height: 16px; border-radius: 4px; border: 2px solid #ffffff; box-shadow: 0 0 6px ${color};"></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
     });
   };
 
