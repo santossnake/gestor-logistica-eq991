@@ -3,15 +3,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Key, MapPin, UserCheck, Map, AlertTriangle, FileText, QrCode, Building, Car } from 'lucide-react';
+import { LayoutDashboard, Key, MapPin, UserCheck, Map, AlertTriangle, FileText, QrCode, Building, Car, Calendar } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const navItems = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { name: 'Gestão de Reservas', href: '/admin/reservas', icon: Calendar },
     { name: 'Utilizadores Logística (Trigramas)', href: '/admin/utilizadores', icon: UserCheck },
-    { name: 'Gestão de Frota (Criar/Apagar)', href: '/admin/viaturas', icon: Car },
+    { name: 'Gestão de Frota', href: '/admin/viaturas', icon: Car },
     { name: 'Cedências Externas', href: '/admin/emprestimos', icon: Building },
     { name: 'Mapa de Percursos', href: '/admin/mapa', icon: Map },
     { name: 'Último Utilizador', href: '/admin/ultimo-utilizador', icon: UserCheck },
