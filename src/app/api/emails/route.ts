@@ -92,41 +92,50 @@ export async function POST(request: Request) {
         break;
     }
 
-    // Try sending email via Resend API if API KEY exists
+    // Send email via Resend API read strictly from process.env.RESEND_API_KEY (.env.local)
     const resendApiKey = process.env.RESEND_API_KEY;
+
     if (resendApiKey) {
       try {
-        await fetch('https://api.resend.com/emails', {
+        const resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${resendApiKey}`,
+            'Authorization': `Bearer ${resendApiKey.trim()}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            from: 'Logistica EQ991 <onboarding@resend.dev>',
+            from: 'Esquadra 991 Logística <onboarding@resend.dev>',
             to: [toEmail],
             subject,
             html: htmlContent
           })
         });
-        console.log(`[EMAIL DISPATCH] Email enviado via Resend para ${toEmail}`);
-      } catch (err) {
-        console.warn('Erro ao enviar via Resend API:', err);
+
+        const resendData = await resendRes.json();
+        console.log(`[RESEND API RESPONSE]`, resendData);
+
+        return NextResponse.json({
+          success: true,
+          tipo,
+          destinatario: toEmail,
+          subject,
+          resend: resendData,
+          timestamp: new Date().toISOString()
+        });
+      } catch (err: any) {
+        console.warn('Erro ao enviar email via Resend API:', err);
+        return NextResponse.json({ success: false, error: err.message }, { status: 500 });
       }
     } else {
-      console.log(`[SIMULADOR EMAIL DISPATCH]
-To: ${toEmail}
-Subject: ${subject}
-Content: ${htmlContent.replace(/<[^>]*>?/gm, '')}`);
+      console.log(`[SIMULADOR EMAIL DISPATCH] To: ${toEmail} | Subject: ${subject}`);
+      return NextResponse.json({
+        success: true,
+        tipo,
+        destinatario: toEmail,
+        subject,
+        timestamp: new Date().toISOString()
+      });
     }
-
-    return NextResponse.json({
-      success: true,
-      tipo,
-      destinatario: toEmail,
-      subject,
-      timestamp: new Date().toISOString()
-    });
   } catch (err: any) {
     console.error('Erro na API de Emails:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
