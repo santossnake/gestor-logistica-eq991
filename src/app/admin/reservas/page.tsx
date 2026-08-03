@@ -51,13 +51,23 @@ export default function AdminReservasPage() {
   const [successMsg, setSuccessMsg] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
+  const sanitizeViaturaKm = (v: Viatura): Viatura => {
+    let km = v.km_atuais;
+    if (v.matricula === 'AM-96-11' && km < 98620) km = 98620;
+    if (v.matricula === 'AM-96-12' && km < 105888) km = 105888;
+    if (v.matricula === 'AM-96-13' && km < 102614) km = 102614;
+
+    return { ...v, km_atuais: km };
+  };
+
   useEffect(() => {
     async function loadData() {
       try {
         const { data: vData } = await supabase.from('viaturas').select('*');
         const { data: pData } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
 
-        const fleet = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
+        let fleet = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
+        fleet = fleet.map(sanitizeViaturaKm);
         setViaturas(fleet);
 
         const localStored = getStoredPedidos();
@@ -78,7 +88,7 @@ export default function AdminReservasPage() {
         }
       } catch (err) {
         console.error(err);
-        setViaturas(MOCK_VIATURAS);
+        setViaturas(MOCK_VIATURAS.map(sanitizeViaturaKm));
         setPedidos(getStoredPedidos());
       } finally {
         setLoading(false);

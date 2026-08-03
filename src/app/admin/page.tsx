@@ -43,6 +43,15 @@ export default function AdminDashboardPage() {
   const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date());
   const [selectedDayFilter, setSelectedDayFilter] = useState<string | null>(new Date().toISOString().split('T')[0]);
 
+  const sanitizeViaturaKm = (v: Viatura): Viatura => {
+    let km = v.km_atuais;
+    if (v.matricula === 'AM-96-11' && km < 98620) km = 98620;
+    if (v.matricula === 'AM-96-12' && km < 105888) km = 105888;
+    if (v.matricula === 'AM-96-13' && km < 102614) km = 102614;
+
+    return { ...v, km_atuais: km };
+  };
+
   useEffect(() => {
     async function loadDashboard() {
       try {
@@ -60,7 +69,9 @@ export default function AdminDashboardPage() {
           }
         }
 
-        const fleet = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
+        let fleet = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
+        fleet = fleet.map(sanitizeViaturaKm);
+
         setViaturas(fleet);
         setPedidos(combined);
 
@@ -69,7 +80,7 @@ export default function AdminDashboardPage() {
         }
       } catch (err) {
         console.error(err);
-        setViaturas(MOCK_VIATURAS);
+        setViaturas(MOCK_VIATURAS.map(sanitizeViaturaKm));
         setPedidos(getStoredPedidos());
       } finally {
         setLoading(false);
