@@ -136,6 +136,20 @@ export default function PedidoPage() {
         </div>
 
         <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a
+            href={`mailto:${profile.email || 'logistica.eq991@emfa.pt'}?subject=${encodeURIComponent(
+              `Esquadra 991 - Confirmação de Reserva [${destino}]`
+            )}&body=${encodeURIComponent(
+              `Exmo. Militar ${profile.posto} ${profile.nome} [NIP ${profile.nip}],\n\nConfirmamos a entrada do seu pedido de reserva para o destino ${destino} com o estado PENDENTE.\n\nPeríodo: ${new Date(dataInicio).toLocaleString()} até ${new Date(dataFim).toLocaleString()}\nMotivo: ${motivo}\n\nLogística Esquadra 991`
+            )}`}
+            target="_blank"
+            rel="noreferrer"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold transition-colors shadow-lg shadow-emerald-950 flex items-center justify-center space-x-2"
+          >
+            <Mail className="w-4 h-4" />
+            <span>Abrir / Enviar Email no Seu Cliente</span>
+          </a>
+
           <button
             onClick={() => setSubmittedSuccess(false)}
             className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-colors"

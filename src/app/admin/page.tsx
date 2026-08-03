@@ -93,9 +93,13 @@ export default function AdminDashboardPage() {
   // Open Approval Modal
   const handleOpenApprovalModal = (p: Pedido) => {
     setApprovingPedido(p);
-    // Auto-select first available vehicle or forced recommendation
-    const rec = viaturas.find((v) => v.estado === 'DISPONIVEL') || viaturas[0];
-    if (rec) setSelectedViaturaIdForApproval(rec.id);
+    // If request already has an assigned vehicle, select it. Otherwise select available or first
+    if (p.viatura_id && viaturas.some((v) => v.id === p.viatura_id)) {
+      setSelectedViaturaIdForApproval(p.viatura_id);
+    } else {
+      const rec = viaturas.find((v) => v.estado === 'DISPONIVEL') || viaturas[0];
+      if (rec) setSelectedViaturaIdForApproval(rec.id);
+    }
   };
 
   // Confirm Approval: Assign Vehicle & Change State to RESERVADA

@@ -114,12 +114,17 @@ export async function POST(request: Request) {
         const resendData = await resendRes.json();
         console.log(`[RESEND API RESPONSE]`, resendData);
 
+        if (resendData.error) {
+          console.warn(`[RESEND NOTICE] Resend devolveu aviso (normal em contas de teste sem domínio próprio verificado):`, resendData.error);
+        }
+
         return NextResponse.json({
-          success: true,
+          success: !resendData.error,
           tipo,
           destinatario: toEmail,
           subject,
           resend: resendData,
+          resendWarning: resendData.error ? resendData.error.message : null,
           timestamp: new Date().toISOString()
         });
       } catch (err: any) {

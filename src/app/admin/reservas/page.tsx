@@ -564,7 +564,7 @@ export default function AdminReservasPage() {
                     <option value="">Sem Viatura Atribuída</option>
                     {viaturas.map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.matricula} - {v.modelo} ({v.km_atuais.toLocaleString()} KM)
+                        {v.matricula} - {v.modelo} ({v.km_atuais.toLocaleString()} KM) [{v.estado}]
                       </option>
                     ))}
                   </select>
