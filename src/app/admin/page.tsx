@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { supabase, Viatura, Pedido } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_PEDIDOS } from '@/lib/mock-data';
-import { getStoredPedidos, saveFleetOverride, saveStoredPedido, updateStoredPedido, deleteStoredPedido } from '@/lib/utils/cookies';
+import { getStoredPedidos, saveFleetOverride, saveStoredPedido, updateStoredPedido, deleteStoredPedido, isReservationOverlapping } from '@/lib/utils/cookies';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
@@ -701,11 +701,23 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setSelectedViaturaIdForApproval(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs font-bold"
                 >
-                  {viaturas.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.matricula} - {v.modelo} ({v.km_atuais.toLocaleString()} KM) [{v.estado}]
-                    </option>
-                  ))}
+                  {viaturas.map((v) => {
+                    const hasOverlap = pedidos.some(
+                      (p) =>
+                        p.id !== approvingPedido.id &&
+                        p.viatura_id === v.id &&
+                        p.estado_pedido === 'APROVADO' &&
+                        isReservationOverlapping(approvingPedido.data_inicio, approvingPedido.data_fim, p.data_inicio, p.data_fim)
+                    );
+
+                    const statusLabel = hasOverlap ? 'RESERVADA (Sobreposição)' : v.estado === 'EM_USO' ? 'EM_USO' : 'DISPONIVEL';
+
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {v.matricula} - {v.modelo} ({v.km_atuais.toLocaleString()} KM) [{statusLabel}]
+                      </option>
+                    );
+                  })}
                 </select>
                 <p className="text-[10px] text-amber-400 mt-1 font-mono">
                   * O estado da viatura passará para <strong>RESERVADA</strong> durante o período da reserva.

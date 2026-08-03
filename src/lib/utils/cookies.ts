@@ -167,6 +167,20 @@ export function saveFleetOverride(viaturaId: string, updates: Record<string, any
   }
 }
 
+export function isReservationOverlapping(
+  start1: string | Date,
+  end1: string | Date,
+  start2: string | Date,
+  end2: string | Date
+): boolean {
+  const s1 = new Date(start1).getTime();
+  const e1 = new Date(end1).getTime();
+  const s2 = new Date(start2).getTime();
+  const e2 = new Date(end2).getTime();
+
+  return s1 < e2 && e1 > s2;
+}
+
 export const saveMilitaryProfile = (profile: MilitaryProfile): void => {
   if (typeof window === 'undefined') return;
 

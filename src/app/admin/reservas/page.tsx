@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { supabase, Pedido, Viatura } from '@/lib/supabase/client';
 import { MOCK_VIATURAS } from '@/lib/mock-data';
-import { getStoredPedidos, saveStoredPedido, POSTOS_FORCA_AEREA, saveFleetOverride, updateStoredPedido, deleteStoredPedido } from '@/lib/utils/cookies';
+import { getStoredPedidos, saveStoredPedido, POSTOS_FORCA_AEREA, saveFleetOverride, updateStoredPedido, deleteStoredPedido, isReservationOverlapping } from '@/lib/utils/cookies';
 
 export default function AdminReservasPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -123,6 +123,17 @@ export default function AdminReservasPage() {
     return true;
   });
 
+  const handleDataInicioChange = (val: string) => {
+    setDataInicio(val);
+    if (val) {
+      const startDate = new Date(val);
+      if (!isNaN(startDate.getTime())) {
+        const autoEnd = new Date(startDate.getTime() + 1 * 3600000);
+        setDataFim(autoEnd.toISOString().slice(0, 16));
+      }
+    }
+  };
+
   const handleOpenCreateModal = () => {
     setEditingPedidoId(null);
     setNomeUtilizador('');
@@ -131,7 +142,7 @@ export default function AdminReservasPage() {
     setEmail('');
 
     const now = new Date();
-    const future = new Date(now.getTime() + 4 * 3600000);
+    const future = new Date(now.getTime() + 1 * 3600000);
     setDataInicio(now.toISOString().slice(0, 16));
     setDataFim(future.toISOString().slice(0, 16));
 
@@ -523,7 +534,7 @@ export default function AdminReservasPage() {
                     type="datetime-local"
                     required
                     value={dataInicio}
-                    onChange={(e) => setDataInicio(e.target.value)}
+                    onChange={(e) => handleDataInicioChange(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono"
                   />
                 </div>
@@ -571,11 +582,25 @@ export default function AdminReservasPage() {
                     className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono font-bold"
                   >
                     <option value="">Sem Viatura Atribuída</option>
-                    {viaturas.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.matricula} - {v.modelo} ({v.km_atuais.toLocaleString()} KM) [{v.estado}]
-                      </option>
-                    ))}
+                    {viaturas.map((v) => {
+                      const hasOverlap = pedidos.some(
+                        (p) =>
+                          p.id !== editingPedidoId &&
+                          p.viatura_id === v.id &&
+                          p.estado_pedido === 'APROVADO' &&
+                          dataInicio &&
+                          dataFim &&
+                          isReservationOverlapping(dataInicio, dataFim, p.data_inicio, p.data_fim)
+                      );
+
+                      const statusLabel = hasOverlap ? 'RESERVADA (Sobreposição)' : v.estado === 'EM_USO' ? 'EM_USO' : 'DISPONIVEL';
+
+                      return (
+                        <option key={v.id} value={v.id}>
+                          {v.matricula} - {v.modelo} ({v.km_atuais.toLocaleString()} KM) [{statusLabel}]
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 

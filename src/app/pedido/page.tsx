@@ -26,12 +26,25 @@ export default function PedidoPage() {
     const stored = getStoredMilitaryProfile();
     setProfile(stored);
 
-    // Set default dates (Now -> Now + 4 hours)
+    // Set default dates (Now -> Now + 1 hour)
     const now = new Date();
-    const future = new Date(now.getTime() + 4 * 3600000);
+    const future = new Date(now.getTime() + 1 * 3600000);
     setDataInicio(now.toISOString().slice(0, 16));
     setDataFim(future.toISOString().slice(0, 16));
   }, []);
+
+  const handleDataInicioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setDataInicio(val);
+
+    if (val) {
+      const startDate = new Date(val);
+      if (!isNaN(startDate.getTime())) {
+        const autoEnd = new Date(startDate.getTime() + 1 * 3600000);
+        setDataFim(autoEnd.toISOString().slice(0, 16));
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,7 +287,7 @@ export default function PedidoPage() {
                 type="datetime-local"
                 required
                 value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
+                onChange={handleDataInicioChange}
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono focus:outline-none focus:border-cyan-500"
               />
             </div>
