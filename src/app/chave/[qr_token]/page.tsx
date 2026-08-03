@@ -127,9 +127,9 @@ export default function ChavePage() {
           setNecessitaLimpeza(vData.necessita_limpeza);
         }
 
-        const { data: lData } = await supabase.from('locais').select('*');
+        const { data: lData } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
         const storedLocs = getStoredLocais();
-        const rawLocais = storedLocs.length > 0 ? storedLocs : (lData && lData.length > 0 ? lData : MOCK_LOCAIS);
+        const rawLocais = lData && lData.length > 0 ? lData : storedLocs;
         const activeLocais = rawLocais.filter((l: any) => l.is_ativo !== false);
 
         if (activeLocais.length > 0) {
