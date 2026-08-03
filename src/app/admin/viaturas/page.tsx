@@ -82,9 +82,9 @@ export default function AdminViaturasPage() {
   // Helper to ensure real odometers and next maintenance target (multiple of 10,000 KM & 1 year from today)
   const sanitizeViaturaKm = (v: Viatura): Viatura => {
     let km = v.km_atuais;
-    if (v.matricula === 'AM-96-11' && km < 90000) km = 98620;
-    if (v.matricula === 'AM-96-12' && km < 90000) km = 105888;
-    if (v.matricula === 'AM-96-13' && km < 90000) km = 102614;
+    if (v.matricula === 'AM-96-11' && km < 98620) km = 98620;
+    if (v.matricula === 'AM-96-12' && km < 105888) km = 105888;
+    if (v.matricula === 'AM-96-13' && km < 102614) km = 102614;
 
     const nextKmTarget = Math.ceil((km + 1) / 10000) * 10000;
     const nextDateTarget = '2027-08-02';

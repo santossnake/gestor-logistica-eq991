@@ -16,11 +16,12 @@ import {
   Filter,
   Check,
   AlertCircle,
-  FileText
+  FileText,
+  Mail
 } from 'lucide-react';
 import { supabase, Pedido, Viatura } from '@/lib/supabase/client';
 import { MOCK_VIATURAS } from '@/lib/mock-data';
-import { getStoredPedidos, saveStoredPedido, POSTOS_FORCA_AEREA, saveFleetOverride } from '@/lib/utils/cookies';
+import { getStoredPedidos, saveStoredPedido, POSTOS_FORCA_AEREA, saveFleetOverride, updateStoredPedido, deleteStoredPedido } from '@/lib/utils/cookies';
 
 export default function AdminReservasPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -169,6 +170,7 @@ export default function AdminReservasPage() {
       if (editingPedidoId) {
         // EDIT existing reservation
         await supabase.from('pedidos').update(payload).eq('id', editingPedidoId);
+        updateStoredPedido(editingPedidoId, payload);
 
         setPedidos((prev) =>
           prev.map((item) => (item.id === editingPedidoId ? { ...item, ...payload } : item))
@@ -215,6 +217,7 @@ export default function AdminReservasPage() {
     try {
       const targetPed = pedidos.find((p) => p.id === id);
       await supabase.from('pedidos').delete().eq('id', id);
+      deleteStoredPedido(id);
 
       setPedidos((prev) => prev.filter((p) => p.id !== id));
 
@@ -352,6 +355,20 @@ export default function AdminReservasPage() {
                       >
                         {p.estado_pedido}
                       </span>
+
+                      <a
+                        href={`mailto:${p.email}?subject=${encodeURIComponent(
+                          `Esquadra 991 - Notificação da Reserva [${p.destino}]`
+                        )}&body=${encodeURIComponent(
+                          `Exmo. Militar ${p.posto} ${p.nome_utilizador} [NIP ${p.nip}],\n\nInformamos que o seu pedido de reserva de viatura para o destino ${p.destino} foi processado com o estado: ${p.estado_pedido}.\n\nCumprimentos,\nLogística Esquadra 991`
+                        )}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-800 flex items-center space-x-1"
+                        title="Enviar Email de Notificação ao Requerente"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </a>
 
                       <button
                         onClick={() => handleOpenEditModal(p)}

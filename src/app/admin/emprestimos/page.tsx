@@ -43,20 +43,26 @@ export default function EmprestimosPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const { data: vData } = await supabase.from('viaturas').select('*').eq('estado', 'DISPONIVEL');
+        const { data: vData } = await supabase.from('viaturas').select('*');
         const { data: eData } = await supabase.from('emprestimos_externos').select('*').order('created_at', { ascending: false });
         const { data: fData } = await supabase.from('fotos_emprestimo').select('*');
 
-        setViaturas(vData && vData.length > 0 ? vData : MOCK_VIATURAS);
-        setEmprestimos(eData && eData.length > 0 ? eData : MOCK_EMPRESTIMOS);
-        setFotos(fData && fData.length > 0 ? fData : MOCK_FOTOS_EMPRESTIMO);
+        let rawFleet = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
+        rawFleet = rawFleet.map((v) => {
+          let km = v.km_atuais;
+          if (v.matricula === 'AM-96-11' && km < 98620) km = 98620;
+          if (v.matricula === 'AM-96-12' && km < 105888) km = 105888;
+          if (v.matricula === 'AM-96-13' && km < 102614) km = 102614;
+          return { ...v, km_atuais: km };
+        });
 
-        if (vData && vData.length > 0) {
-          setSelectedViaturaId(vData[0].id);
-          setKmInicio(vData[0].km_atuais);
-        } else if (MOCK_VIATURAS.length > 0) {
-          setSelectedViaturaId(MOCK_VIATURAS[0].id);
-          setKmInicio(MOCK_VIATURAS[0].km_atuais);
+        setViaturas(rawFleet);
+        setEmprestimos(eData || []);
+        setFotos(fData || []);
+
+        if (rawFleet.length > 0) {
+          setSelectedViaturaId(rawFleet[0].id);
+          setKmInicio(rawFleet[0].km_atuais);
         }
 
         const date = new Date(Date.now() + 7 * 86400000);

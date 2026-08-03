@@ -73,10 +73,32 @@ export function saveStoredPedido(pedido: any) {
   if (typeof window === 'undefined') return;
   try {
     const current = getStoredPedidos();
-    const updated = [pedido, ...current];
+    const updated = [pedido, ...current.filter((p) => p.id !== pedido.id)];
     localStorage.setItem(PEDIDOS_STORAGE_KEY, JSON.stringify(updated));
   } catch (err) {
     console.error('Erro ao guardar pedido localmente:', err);
+  }
+}
+
+export function updateStoredPedido(id: string, updates: Record<string, any>) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredPedidos();
+    const updated = current.map((p) => (p.id === id ? { ...p, ...updates } : p));
+    localStorage.setItem(PEDIDOS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Erro ao atualizar pedido localmente:', err);
+  }
+}
+
+export function deleteStoredPedido(id: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredPedidos();
+    const updated = current.filter((p) => p.id !== id);
+    localStorage.setItem(PEDIDOS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Erro ao apagar pedido localmente:', err);
   }
 }
 
@@ -110,13 +132,15 @@ export function getFleetOverrides(): Record<string, any> {
     if (!raw) return {};
     const parsed = JSON.parse(raw);
 
-    // Auto-clean any stale entry with < 90,000 KM
+    // Auto-clean any stale entry with odometers lower than real baselines
     const cleaned: Record<string, any> = {};
     for (const [key, val] of Object.entries(parsed)) {
       const entry = val as any;
-      if (entry && typeof entry === 'object' && entry.km_atuais && entry.km_atuais < 90000) {
-        // Skip stale entry
-        continue;
+      if (entry && typeof entry === 'object' && entry.km_atuais) {
+        if (entry.matricula === 'AM-96-11' && entry.km_atuais < 98620) continue;
+        if (entry.matricula === 'AM-96-12' && entry.km_atuais < 105888) continue;
+        if (entry.matricula === 'AM-96-13' && entry.km_atuais < 102614) continue;
+        if (entry.km_atuais < 90000) continue;
       }
       cleaned[key] = val;
     }

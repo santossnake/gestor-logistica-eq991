@@ -12,9 +12,9 @@ export default function RecomendadaPage() {
   // Synchronous calculation of top recommended vehicle on initial render
   // Helper to ensure real odometers > 90k KM
   const sanitizeViaturaKm = (v: Viatura): Viatura => {
-    if (v.matricula === 'AM-96-11' && v.km_atuais < 90000) return { ...v, km_atuais: 98620 };
-    if (v.matricula === 'AM-96-12' && v.km_atuais < 90000) return { ...v, km_atuais: 105888 };
-    if (v.matricula === 'AM-96-13' && v.km_atuais < 90000) return { ...v, km_atuais: 102614 };
+    if (v.matricula === 'AM-96-11' && v.km_atuais < 98620) return { ...v, km_atuais: 98620 };
+    if (v.matricula === 'AM-96-12' && v.km_atuais < 105888) return { ...v, km_atuais: 105888 };
+    if (v.matricula === 'AM-96-13' && v.km_atuais < 102614) return { ...v, km_atuais: 102614 };
     return v;
   };
 

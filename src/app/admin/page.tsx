@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { supabase, Viatura, Pedido } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_PEDIDOS } from '@/lib/mock-data';
-import { getStoredPedidos, saveFleetOverride, saveStoredPedido } from '@/lib/utils/cookies';
+import { getStoredPedidos, saveFleetOverride, saveStoredPedido, updateStoredPedido, deleteStoredPedido } from '@/lib/utils/cookies';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
@@ -118,6 +118,12 @@ export default function AdminDashboardPage() {
 
       saveFleetOverride(selectedViaturaIdForApproval, { estado: 'RESERVADA' });
 
+      // Update local storage pedido
+      updateStoredPedido(approvingPedido.id, {
+        estado_pedido: 'APROVADO',
+        viatura_id: selectedViaturaIdForApproval
+      });
+
       // Update state locally
       setPedidos((prev) => prev.map((p) => (p.id === approvingPedido.id ? updatedPedido : p)));
       setViaturas((prev) =>
@@ -147,9 +153,12 @@ export default function AdminDashboardPage() {
   const handleRejeitarPedido = async (id: string) => {
     try {
       await supabase.from('pedidos').update({ estado_pedido: 'REJEITADO' }).eq('id', id);
+      updateStoredPedido(id, { estado_pedido: 'REJEITADO' });
       setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, estado_pedido: 'REJEITADO' } : p)));
     } catch (err) {
       console.error(err);
+      updateStoredPedido(id, { estado_pedido: 'REJEITADO' });
+      setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, estado_pedido: 'REJEITADO' } : p)));
     }
   };
 

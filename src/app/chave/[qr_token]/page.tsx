@@ -114,10 +114,16 @@ export default function ChavePage() {
       try {
         const { data: vData } = await supabase.from('viaturas').select('*').eq('qr_code_token', qrToken).single();
         if (vData) {
-          setViatura(vData);
-          setKmInicialInput(vData.km_atuais);
-          setKmFinalInput(vData.km_atuais);
-          setAbastKm(vData.km_atuais);
+          let km = vData.km_atuais;
+          if (vData.matricula === 'AM-96-11' && km < 98620) km = 98620;
+          if (vData.matricula === 'AM-96-12' && km < 105888) km = 105888;
+          if (vData.matricula === 'AM-96-13' && km < 102614) km = 102614;
+
+          const sanitized = { ...vData, km_atuais: km };
+          setViatura(sanitized);
+          setKmInicialInput(km);
+          setKmFinalInput(km);
+          setAbastKm(km);
           setNecessitaLimpeza(vData.necessita_limpeza);
         }
 
