@@ -67,18 +67,8 @@ export const MOCK_VIATURAS: Viatura[] = [
   }
 ];
 
-// Official Locations
-export const MOCK_LOCAIS: LocalItem[] = [
-  { id: 'loc-01', nome: 'Telheiro 991', tipo: 'VIATURA', is_predefinido: true, is_ativo: true },
-  { id: 'loc-02', nome: 'Estacionamento Alternativo ao Telheiro 991', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
-  { id: 'loc-03', nome: 'Hangar 6', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
-  { id: 'loc-04', nome: 'Oficial de Dia', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
-  { id: 'loc-05', nome: 'Hotel Mirandela', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
-  { id: 'loc-06', nome: 'Alojamento BA11', tipo: 'VIATURA', is_predefinido: false, is_ativo: true },
-  { id: 'loc-07', nome: 'Chaveiro 991', tipo: 'CHAVE', is_predefinido: true, is_ativo: true },
-  { id: 'loc-08', nome: 'Logística', tipo: 'CHAVE', is_predefinido: false, is_ativo: true },
-  { id: 'loc-09', nome: 'Oficial de Dia', tipo: 'CHAVE', is_predefinido: false, is_ativo: true }
-];
+// Locations are fetched 100% live from online Supabase DB
+export const MOCK_LOCAIS: LocalItem[] = [];
 
 // Clean empty arrays for production use with real data
 export const MOCK_PEDIDOS: Pedido[] = [];

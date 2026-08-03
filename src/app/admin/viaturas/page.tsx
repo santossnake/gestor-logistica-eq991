@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { supabase, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_GPS, MOCK_LOCAIS } from '@/lib/mock-data';
-import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride, getStoredLocais, logAuditAction } from '@/lib/utils/cookies';
+import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride, getStoredLocais, saveStoredLocais, logAuditAction } from '@/lib/utils/cookies';
 
 const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false });
 
@@ -75,16 +75,12 @@ export default function AdminViaturasPage() {
 
   const [dbLocais, setDbLocais] = useState<any[]>([]);
 
-  // Compute available locations dynamically from dbLocais
+  // Compute available locations dynamically from dbLocais strictly
   const vtrLocsFromSystem = dbLocais.filter((l: any) => l.tipo === 'VIATURA').map((l: any) => l.nome);
-  const allVtrLocations = vtrLocsFromSystem.length > 0
-    ? Array.from(new Set(vtrLocsFromSystem))
-    : ['Telheiro 991', 'Estacionamento Alternativo ao Telheiro 991', 'Hangar 6', 'Oficial de Dia', 'Hotel Mirandela', 'Alojamento BA11'];
+  const allVtrLocations = Array.from(new Set(vtrLocsFromSystem));
 
   const keyLocsFromSystem = dbLocais.filter((l: any) => l.tipo === 'CHAVE').map((l: any) => l.nome);
-  const allKeyLocations = keyLocsFromSystem.length > 0
-    ? Array.from(new Set(keyLocsFromSystem))
-    : ['Chaveiro 991', 'Logística', 'Oficial de Dia'];
+  const allKeyLocations = Array.from(new Set(keyLocsFromSystem));
 
   const handleSelectLocalViaturaOption = (val: string) => {
     setSelectedLocalViaturaOption(val);
@@ -141,13 +137,14 @@ export default function AdminViaturasPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const storedLocs = getStoredLocais();
-        if (storedLocs.length > 0) {
-          setDbLocais(storedLocs.filter((l: any) => l.is_ativo !== false));
+        const { data: lData } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
+        if (lData) {
+          const active = lData.filter((l: any) => l.is_ativo !== false);
+          setDbLocais(active);
+          saveStoredLocais(lData);
         } else {
-          const { data: lData } = await supabase.from('locais').select('*');
-          const list = lData && lData.length > 0 ? lData : MOCK_LOCAIS;
-          setDbLocais(list.filter((l: any) => l.is_ativo !== false));
+          const storedLocs = getStoredLocais();
+          setDbLocais(storedLocs.filter((l: any) => l.is_ativo !== false));
         }
 
         const overrides = getFleetOverrides();

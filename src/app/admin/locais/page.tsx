@@ -24,19 +24,18 @@ export default function LocaisAdminPage() {
   useEffect(() => {
     async function fetchLocais() {
       try {
-        const stored = getStoredLocais();
-        if (stored && stored.length > 0) {
-          setLocais(stored);
+        const { data, error } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
+        if (!error && data) {
+          setLocais(data);
+          saveStoredLocais(data);
         } else {
-          const { data } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
-          const list = data && data.length > 0 ? data : MOCK_LOCAIS;
-          setLocais(list);
-          saveStoredLocais(list);
+          const stored = getStoredLocais();
+          setLocais(stored);
         }
       } catch (err) {
         console.error(err);
         const stored = getStoredLocais();
-        setLocais(stored.length > 0 ? stored : MOCK_LOCAIS);
+        setLocais(stored);
       } finally {
         setLoading(false);
       }
