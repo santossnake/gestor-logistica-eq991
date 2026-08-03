@@ -1,23 +1,12 @@
 import { NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { tipo, emailDestinatario, nip, nome, destino, dataInicio, dataFim, necessitaReboque, matricula, nivelCombustivel, descricao, gravidade, motivo, mensagem, entidade, nomeResp, dataFimPrevista } = body;
 
-    console.log(`[EMAIL API] A processar disparo de email do tipo: ${tipo} para ${emailDestinatario || 'logistica.eq991@emfa.pt'}`);
-
-    // Create Nodemailer transport (uses SMTP configuration if provided, or logs to console as fallback)
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER || 'demo@ethereal.email',
-        pass: process.env.SMTP_PASS || 'demopass',
-      },
-    });
+    const toEmail = emailDestinatario || 'logistica.eq991@emfa.pt';
+    console.log(`[EMAIL API] A processar disparo de email do tipo: ${tipo} para ${toEmail}`);
 
     let subject = 'Esquadra 991 - Notificação do Sistema de Viaturas';
     let htmlContent = `<p>Notificação da Esquadra 991 (Força Aérea).</p>`;
@@ -40,6 +29,7 @@ export async function POST(request: Request) {
           <h2>Esquadra 991 - Força Aérea Portuguesa</h2>
           <p>Exmo. Militar ${nome},</p>
           <p>Informamos que o seu pedido de viatura com destino a <strong>${destino}</strong> foi <span style="color: #16a34a; font-weight: bold;">APROVADO</span>.</p>
+          <p>Viatura Atribuída: <strong>${matricula || 'Nissan Navara 4x4'}</strong></p>
           <p>À chegada ao chaveiro, digitalize o QR Code do porta-chaves ou utilize a opção "Viatura Recomendada".</p>
         `;
         break;
@@ -102,19 +92,41 @@ export async function POST(request: Request) {
         break;
     }
 
-    // Try sending email (swallows network errors in demo environment)
-    try {
-      await transporter.sendMail({
-        from: '"Logística EQ991" <logistica.eq991@emfa.pt>',
-        to: emailDestinatario || 'logistica.eq991@emfa.pt',
-        subject,
-        html: htmlContent
-      });
-    } catch (e) {
-      console.warn('Transporte SMTP simulado em ambiente local:', e);
+    // Try sending email via Resend API if API KEY exists
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (resendApiKey) {
+      try {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: 'Logistica EQ991 <onboarding@resend.dev>',
+            to: [toEmail],
+            subject,
+            html: htmlContent
+          })
+        });
+        console.log(`[EMAIL DISPATCH] Email enviado via Resend para ${toEmail}`);
+      } catch (err) {
+        console.warn('Erro ao enviar via Resend API:', err);
+      }
+    } else {
+      console.log(`[SIMULADOR EMAIL DISPATCH]
+To: ${toEmail}
+Subject: ${subject}
+Content: ${htmlContent.replace(/<[^>]*>?/gm, '')}`);
     }
 
-    return NextResponse.json({ success: true, tipo, timestamp: new Date().toISOString() });
+    return NextResponse.json({
+      success: true,
+      tipo,
+      destinatario: toEmail,
+      subject,
+      timestamp: new Date().toISOString()
+    });
   } catch (err: any) {
     console.error('Erro na API de Emails:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

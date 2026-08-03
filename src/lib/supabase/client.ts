@@ -12,7 +12,7 @@ export interface Viatura {
   num_lugares: number;
   tem_gancho_reboque: boolean;
   km_atuais: number;
-  estado: 'DISPONIVEL' | 'EM_USO' | 'MANUTENCAO' | 'EMPRESTADA_EXTERNO';
+  estado: 'DISPONIVEL' | 'RESERVADA' | 'EM_USO' | 'MANUTENCAO' | 'EMPRESTADA_EXTERNO';
   necessita_limpeza: boolean;
   data_ultima_limpeza?: string;
   limpo_por_nip?: string;

@@ -527,6 +527,8 @@ export default function AdminViaturasPage() {
                     className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold ${
                       v.estado === 'DISPONIVEL'
                         ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                        : v.estado === 'RESERVADA'
+                        ? 'bg-amber-950 text-amber-300 border border-amber-800'
                         : v.estado === 'EM_USO'
                         ? 'bg-blue-950 text-blue-400 border border-blue-800'
                         : 'bg-rose-950 text-rose-400 border border-rose-800'
