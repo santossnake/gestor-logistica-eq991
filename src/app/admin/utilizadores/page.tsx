@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { User, Shield, Mail, KeyRound, Plus, Edit2, Trash2, Send, CheckCircle2, AlertTriangle, RefreshCw, Badge } from 'lucide-react';
+import { User, Shield, Mail, KeyRound, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, RefreshCw, Badge } from 'lucide-react';
 import { supabase, UtilizadorLogistica } from '@/lib/supabase/client';
 import { MOCK_UTILIZADORES_LOGISTICA } from '@/lib/mock-data';
-import { POSTOS_FORCA_AEREA, getStoredUtilizadores, saveStoredUtilizadores } from '@/lib/utils/cookies';
+import { POSTOS_FORCA_AEREA, getStoredUtilizadores, saveStoredUtilizadores, logAuditAction } from '@/lib/utils/cookies';
 
 export default function GestaoUtilizadoresPage() {
   const [utilizadores, setUtilizadores] = useState<UtilizadorLogistica[]>([]);
@@ -19,9 +19,9 @@ export default function GestaoUtilizadoresPage() {
   const [especialidade, setEspecialidade] = useState<string>('MELECA');
   const [email, setEmail] = useState<string>('');
   const [trigrama, setTrigrama] = useState<string>('');
+  const [password, setPassword] = useState<string>('123456');
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [sendingResetId, setSendingResetId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
 
@@ -71,6 +71,7 @@ export default function GestaoUtilizadoresPage() {
     setEspecialidade('MELECA');
     setEmail('');
     setTrigrama('');
+    setPassword('123456');
     setErrorMsg('');
   };
 
@@ -82,6 +83,7 @@ export default function GestaoUtilizadoresPage() {
     setEspecialidade(u.especialidade);
     setEmail(u.email);
     setTrigrama(u.trigrama);
+    setPassword(u.password || '123456');
   };
 
   const handleSalvarUtilizador = async (e: React.FormEvent) => {
@@ -101,6 +103,7 @@ export default function GestaoUtilizadoresPage() {
       return;
     }
 
+    const userPass = password.trim() || '123456';
     setIsSubmitting(true);
 
     try {
@@ -112,14 +115,21 @@ export default function GestaoUtilizadoresPage() {
           posto,
           especialidade,
           email,
-          trigrama: triClean
+          trigrama: triClean,
+          password: userPass
         };
 
         const { error } = await supabase.from('utilizadores_logistica').update(payload).eq('id', editingId);
         if (error) console.warn('Fallback update:', error.message);
 
         updatedList = utilizadores.map((u) => (u.id === editingId ? { ...u, ...payload } : u));
-        setSuccessMsg(`Utilizador ${nome} [Trigrama: ${triClean}] atualizado com sucesso!`);
+        setSuccessMsg(`Utilizador ${nome} [Trigrama: ${triClean}] e palavra-passe atualizados com sucesso!`);
+
+        logAuditAction(
+          'UTILIZADORES',
+          'Alteração de Palavra-Passe / Perfil',
+          `Alterou os dados/palavra-passe do gestor de logística [${triClean}] ${nome}.`
+        );
       } else {
         const newPayload = {
           nome,
@@ -127,6 +137,7 @@ export default function GestaoUtilizadoresPage() {
           especialidade,
           email,
           trigrama: triClean,
+          password: userPass,
           is_ativo: true
         };
 
@@ -134,7 +145,13 @@ export default function GestaoUtilizadoresPage() {
         const createdU: UtilizadorLogistica = data && data.length > 0 ? data[0] : { id: `user-${Date.now()}`, ...newPayload };
 
         updatedList = [...utilizadores, createdU];
-        setSuccessMsg(`Novo utilizador de logística ${nome} [Trigrama: ${triClean}] criado com sucesso!`);
+        setSuccessMsg(`Novo utilizador de logística ${nome} [Trigrama: ${triClean}] criado com sucesso! (Password: ${userPass})`);
+
+        logAuditAction(
+          'UTILIZADORES',
+          'Criação de Gestor de Logística',
+          `Criou o utilizador [${triClean}] ${nome} com a palavra-passe "${userPass}".`
+        );
       }
 
       setUtilizadores(updatedList);
@@ -144,32 +161,6 @@ export default function GestaoUtilizadoresPage() {
       setErrorMsg(err.message || 'Erro ao guardar utilizador.');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleEnviarResetPassword = async (u: UtilizadorLogistica) => {
-    setSendingResetId(u.id);
-    setSuccessMsg('');
-    setErrorMsg('');
-
-    try {
-      await fetch('/api/emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipo: 'RESET_PASSWORD_TRIGRAMA',
-          emailDestinatario: u.email,
-          nome: u.nome,
-          posto: u.posto,
-          trigrama: u.trigrama
-        })
-      });
-
-      setSuccessMsg(`Email de redefinição de palavra-passe enviado para ${u.email} (Trigrama: ${u.trigrama}).`);
-    } catch (err: any) {
-      setErrorMsg('Erro ao enviar email de reset de palavra-passe.');
-    } finally {
-      setSendingResetId(null);
     }
   };
 
@@ -184,6 +175,12 @@ export default function GestaoUtilizadoresPage() {
       setUtilizadores(updatedList);
       saveStoredUtilizadores(updatedList);
       setSuccessMsg(`Utilizador [${tri}] apagado com sucesso.`);
+
+      logAuditAction(
+        'UTILIZADORES',
+        'Eliminação de Utilizador',
+        `Apagou o utilizador de logística [${tri}] ${name}.`
+      );
     } catch (err) {
       console.error(err);
     }
@@ -199,10 +196,10 @@ export default function GestaoUtilizadoresPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-100 uppercase tracking-wider">
-              Gestão de Utilizadores da Logística (Trigramas)
+              Gestão de Utilizadores da Logística & Palavras-passe
             </h1>
             <p className="text-xs text-slate-400">
-              Registe administradores com Nome, Posto, Especialidade, Email e Trigrama (Username de Login).
+              Gerir gestores de logística, Trigramas e alterar palavras-passe (Password por defeito: 123456).
             </p>
           </div>
         </div>
@@ -227,7 +224,7 @@ export default function GestaoUtilizadoresPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center space-x-2">
             <Plus className="w-4 h-4" />
-            <span>{isEditing ? `Editar Utilizador [${trigrama}]` : 'Registar Novo Gestor de Logística'}</span>
+            <span>{isEditing ? `Editar Utilizador [${trigrama}] & Alterar Password` : 'Registar Novo Gestor de Logística'}</span>
           </h2>
           {isEditing && (
             <button
@@ -253,20 +250,20 @@ export default function GestaoUtilizadoresPage() {
             />
           </div>
 
-                <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Posto / Graduação *</label>
-                  <select
-                    value={posto}
-                    onChange={(e) => setPosto(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs"
-                  >
-                    {POSTOS_FORCA_AEREA.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <div>
+            <label className="block text-slate-400 mb-1 font-semibold">Posto / Graduação *</label>
+            <select
+              value={posto}
+              onChange={(e) => setPosto(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs"
+            >
+              {POSTOS_FORCA_AEREA.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <label className="block text-slate-400 mb-1">Especialidade *</label>
@@ -293,7 +290,7 @@ export default function GestaoUtilizadoresPage() {
           </div>
 
           <div>
-            <label className="block text-slate-400 mb-1">Trigrama (Username de Login) *</label>
+            <label className="block text-slate-400 mb-1">Trigrama (Username) *</label>
             <input
               type="text"
               required
@@ -303,7 +300,19 @@ export default function GestaoUtilizadoresPage() {
               placeholder="Ex: OLV"
               className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-emerald-500/50 text-emerald-400 font-mono font-black text-sm uppercase"
             />
-            <p className="text-[10px] text-slate-500 mt-1">Código de 3 letras utilizado como nome de utilizador para login.</p>
+          </div>
+
+          <div>
+            <label className="block text-amber-300 font-semibold mb-1">Palavra-passe de Acesso *</label>
+            <input
+              type="text"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="123456"
+              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-amber-500/60 text-amber-300 font-mono font-bold text-sm"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">Por defeito é 123456. Editável por qualquer gestor.</p>
           </div>
         </div>
 
@@ -313,7 +322,7 @@ export default function GestaoUtilizadoresPage() {
           className="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-950 flex items-center justify-center space-x-2 transition-all"
         >
           <User className="w-4 h-4" />
-          <span>{isEditing ? 'Guardar Alterações do Utilizador' : 'Registar Utilizador de Logística'}</span>
+          <span>{isEditing ? 'Guardar Alterações & Nova Password' : 'Registar Utilizador & Palavra-passe'}</span>
         </button>
       </form>
 
@@ -341,35 +350,28 @@ export default function GestaoUtilizadoresPage() {
               <div>
                 <h4 className="text-sm font-bold text-slate-100">{u.posto} {u.nome}</h4>
                 <p className="text-xs font-mono text-slate-400">{u.email}</p>
+                <div className="mt-1 pt-1 border-t border-slate-800 text-[11px] font-mono text-amber-300 flex items-center space-x-1">
+                  <KeyRound className="w-3 h-3 text-amber-400" />
+                  <span>Password: {u.password || '123456'}</span>
+                </div>
               </div>
 
-              <div className="pt-2 border-t border-slate-800/80 space-y-2">
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
                 <button
-                  onClick={() => handleEnviarResetPassword(u)}
-                  disabled={sendingResetId === u.id}
-                  className="w-full py-1.5 px-3 rounded bg-amber-600/20 hover:bg-amber-600/40 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors"
+                  onClick={() => handleEditClick(u)}
+                  className="text-emerald-400 hover:text-emerald-300 font-mono flex items-center space-x-1 font-bold"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{sendingResetId === u.id ? 'A enviar reset...' : '📧 Enviar Reset de Palavra-passe'}</span>
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Editar / Mudar Password</span>
                 </button>
 
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <button
-                    onClick={() => handleEditClick(u)}
-                    className="text-slate-400 hover:text-white font-mono flex items-center space-x-1"
-                  >
-                    <Edit2 className="w-3 h-3" />
-                    <span>Editar</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleApagarUtilizador(u.id, u.nome, u.trigrama)}
-                    className="text-rose-400 hover:text-rose-300 font-mono flex items-center space-x-1"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Apagar</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleApagarUtilizador(u.id, u.nome, u.trigrama)}
+                  className="text-rose-400 hover:text-rose-300 font-mono flex items-center space-x-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Apagar</span>
+                </button>
               </div>
             </div>
           ))}

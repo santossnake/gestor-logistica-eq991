@@ -148,6 +148,7 @@ export interface UtilizadorLogistica {
   especialidade: string;
   email: string;
   trigrama: string;
+  password?: string;
   is_ativo: boolean;
   ultimo_acesso?: string;
   created_at?: string;

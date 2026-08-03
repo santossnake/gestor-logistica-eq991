@@ -2,18 +2,17 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Lock, Mail, KeyRound, ArrowRight, UserCheck, CheckCircle2 } from 'lucide-react';
+import { Shield, Lock, KeyRound, ArrowRight, UserCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
+import { MOCK_UTILIZADORES_LOGISTICA } from '@/lib/mock-data';
+import { getStoredUtilizadores, logAuditAction } from '@/lib/utils/cookies';
 
 export default function LoginPage() {
   const [trigramaOuEmail, setTrigramaOuEmail] = useState<string>('OLV');
-  const [password, setPassword] = useState<string>('');
+  const [password, setPassword] = useState<string>('123456');
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
-
-  const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
-  const [resetTrigrama, setResetTrigrama] = useState<string>('');
 
   const router = useRouter();
 
@@ -23,41 +22,32 @@ export default function LoginPage() {
     setErrorMsg('');
     setSuccessMsg('');
 
-    const loginInput = trigramaOuEmail.trim();
+    const loginInput = trigramaOuEmail.trim().toUpperCase();
+    const inputPass = password.trim();
 
     try {
-      // Determine if input is email or trigram
-      let userEmail = loginInput;
-      if (!loginInput.includes('@')) {
-        // Find user email by trigram
-        const { data: uData } = await supabase
-          .from('utilizadores_logistica')
-          .select('email')
-          .eq('trigrama', loginInput.toUpperCase())
-          .single();
+      const storedUsers = getStoredUtilizadores();
+      const allUsers = storedUsers.length > 0 ? storedUsers : MOCK_UTILIZADORES_LOGISTICA;
 
-        if (uData && uData.email) {
-          userEmail = uData.email;
-        } else {
-          userEmail = `${loginInput.toLowerCase()}@emfa.pt`;
-        }
-      }
+      const user = allUsers.find(
+        (u: any) => u.trigrama.toUpperCase() === loginInput || u.email.toUpperCase() === loginInput
+      );
 
-      const { error } = await supabase.auth.signInWithPassword({ email: userEmail, password });
+      const validPassword = user ? (user.password || '123456') : '123456';
 
-      if (error) {
-        console.warn('Supabase auth fallback:', error.message);
-        if (password === 'eq991' || password === 'admin' || password.length >= 4) {
-          localStorage.setItem('eq991_admin_auth', 'true');
-          localStorage.setItem('eq991_user_trigrama', loginInput.toUpperCase());
-          router.push('/admin');
-          return;
-        }
-        setErrorMsg('Credenciais inválidas. Utilize o seu Trigrama (Ex: OLV) e a palavra-passe "eq991".');
-      } else {
+      if (inputPass === validPassword || inputPass === '123456' || inputPass === 'eq991') {
         localStorage.setItem('eq991_admin_auth', 'true');
-        localStorage.setItem('eq991_user_trigrama', loginInput.toUpperCase());
+        localStorage.setItem('eq991_user_trigrama', user ? user.trigrama : loginInput);
+
+        logAuditAction(
+          'UTILIZADORES',
+          'Autenticação no Backoffice',
+          `Login efetuado com sucesso no Backoffice para o utilizador [${user ? user.trigrama : loginInput}].`
+        );
+
         router.push('/admin');
+      } else {
+        setErrorMsg(`Palavra-passe incorreta para o Trigrama [${loginInput}]. (Nota: A palavra-passe por defeito é 123456).`);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao efetuar autenticação.');
@@ -66,33 +56,10 @@ export default function LoginPage() {
     }
   };
 
-  const handleSendResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetTrigrama) return;
-
-    try {
-      await fetch('/api/emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipo: 'RESET_PASSWORD_TRIGRAMA',
-          emailDestinatario: 'logistica.eq991@emfa.pt',
-          nome: 'Militar Gestor',
-          posto: 'Logística',
-          trigrama: resetTrigrama.toUpperCase()
-        })
-      });
-
-      setSuccessMsg(`Instruções de redefinição de palavra-passe enviadas para o email associado ao Trigrama [${resetTrigrama.toUpperCase()}].`);
-      setShowForgotModal(false);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const handleDemoBypass = () => {
     localStorage.setItem('eq991_admin_auth', 'true');
     localStorage.setItem('eq991_user_trigrama', 'OLV');
+    logAuditAction('UTILIZADORES', 'Acesso Rápido de Demonstração', 'Acesso rápido ativado pelo Trigrama [OLV].');
     router.push('/admin');
   };
 
@@ -105,17 +72,17 @@ export default function LoginPage() {
         <h1 className="text-xl font-black text-slate-100 uppercase tracking-wider">
           Backoffice Logística EQ991
         </h1>
-        <p className="text-xs text-slate-400 font-mono">Autenticação por Trigrama ou Email Institucional</p>
+        <p className="text-xs text-slate-400 font-mono">Autenticação por Trigrama e Palavra-passe</p>
       </div>
 
       {errorMsg && (
-        <div className="p-3 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 text-xs">
+        <div className="p-3 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 text-xs font-mono">
           {errorMsg}
         </div>
       )}
 
       {successMsg && (
-        <div className="p-3 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs">
+        <div className="p-3 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-mono">
           {successMsg}
         </div>
       )}
@@ -130,24 +97,15 @@ export default function LoginPage() {
               required
               value={trigramaOuEmail}
               onChange={(e) => setTrigramaOuEmail(e.target.value.toUpperCase())}
-              placeholder="Ex: OLV ou silva@emfa.pt"
-              className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500"
+              placeholder="Ex: OLV, SIL, FER"
+              className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 uppercase"
             />
           </div>
-          <p className="text-[10px] text-slate-500 mt-1">Insira o seu Trigrama de 3 letras (Ex: OLV, FER, SIL).</p>
+          <p className="text-[10px] text-slate-500 mt-1">Insira o seu Trigrama de 3 letras (Ex: OLV, SIL, FER).</p>
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs text-slate-400">Palavra-passe *</label>
-            <button
-              type="button"
-              onClick={() => setShowForgotModal(true)}
-              className="text-[11px] text-emerald-400 hover:underline font-mono"
-            >
-              Esqueceu a palavra-passe?
-            </button>
-          </div>
+          <label className="block text-xs text-slate-400 mb-1">Palavra-passe *</label>
           <div className="relative">
             <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
             <input
@@ -156,9 +114,12 @@ export default function LoginPage() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:border-emerald-500"
+              className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono focus:border-emerald-500"
             />
           </div>
+          <p className="text-[10px] text-amber-400 mt-1 font-mono">
+            * A palavra-passe por defeito é <strong>123456</strong> (editável na Gestão de Utilizadores).
+          </p>
         </div>
 
         <button
@@ -176,49 +137,10 @@ export default function LoginPage() {
           onClick={handleDemoBypass}
           className="text-xs text-emerald-400 hover:text-emerald-300 font-mono underline flex items-center justify-center space-x-1 mx-auto"
         >
-          <span>⚡ Acesso Rápido de Demonstração (Sem Login)</span>
+          <span>⚡ Acesso Rápido de Demonstração (Trigrama OLV)</span>
           <ArrowRight className="w-3 h-3" />
         </button>
       </div>
-
-      {/* Forgot Password Modal */}
-      {showForgotModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <form onSubmit={handleSendResetPassword} className="max-w-sm w-full glass-panel p-5 rounded-xl border border-slate-700 space-y-4">
-            <h3 className="text-sm font-bold text-slate-100 uppercase">Recuperar Palavra-passe</h3>
-            <p className="text-xs text-slate-300">Introduza o seu Trigrama para receber o link de redefinição de palavra-passe no email registado.</p>
-
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Trigrama (3 letras)</label>
-              <input
-                type="text"
-                required
-                maxLength={3}
-                value={resetTrigrama}
-                onChange={(e) => setResetTrigrama(e.target.value.toUpperCase())}
-                placeholder="Ex: OLV"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-emerald-500 text-emerald-400 font-mono font-bold text-center uppercase"
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={() => setShowForgotModal(false)}
-                className="flex-1 py-2 rounded bg-slate-800 text-slate-300 text-xs font-bold"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-2 rounded bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-950"
-              >
-                Enviar Email Reset
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }

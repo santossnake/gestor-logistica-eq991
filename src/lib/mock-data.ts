@@ -87,4 +87,38 @@ export const MOCK_ANOMALIAS: Anomalia[] = [];
 export const MOCK_EMPRESTIMOS: EmprestimoExterno[] = [];
 export const MOCK_FOTOS_EMPRESTIMO: FotoEmprestimo[] = [];
 export const MOCK_GPS: HistoricoGps[] = [];
-export const MOCK_UTILIZADORES_LOGISTICA: UtilizadorLogistica[] = [];
+export const MOCK_UTILIZADORES_LOGISTICA: UtilizadorLogistica[] = [
+  {
+    id: 'usr-01',
+    nome: 'Manuel Oliveira',
+    posto: 'TEN',
+    especialidade: 'MELECA',
+    email: 'oliveira@emfa.pt',
+    trigrama: 'OLV',
+    password: '123456',
+    is_ativo: true,
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'usr-02',
+    nome: 'João Silva',
+    posto: '1SAR',
+    especialidade: 'MELIA',
+    email: 'silva@emfa.pt',
+    trigrama: 'SIL',
+    password: '123456',
+    is_ativo: true,
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'usr-03',
+    nome: 'Pedro Ferreira',
+    posto: 'CAP',
+    especialidade: 'LOGÍSTICA',
+    email: 'ferreira@emfa.pt',
+    trigrama: 'FER',
+    password: '123456',
+    is_ativo: true,
+    created_at: new Date().toISOString()
+  }
+];
