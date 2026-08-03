@@ -73,24 +73,18 @@ export default function AdminViaturasPage() {
   const [kmProximaRevisao, setKmProximaRevisao] = useState<number>(110000);
   const [dataProximaRevisao, setDataProximaRevisao] = useState<string>('2026-11-15');
 
-  // Compute available locations dynamically
-  const storedLocais = typeof window !== 'undefined' ? getStoredLocais() : [];
-  const systemLocais = storedLocais.length > 0 ? storedLocais : MOCK_LOCAIS;
+  const [dbLocais, setDbLocais] = useState<any[]>([]);
 
-  const defaultVtrLocs = [
-    'Telheiro 991',
-    'Estacionamento Alternativo ao Telheiro 991',
-    'Hangar 6',
-    'Oficial de Dia',
-    'Hotel Mirandela',
-    'Alojamento BA11'
-  ];
-  const vtrLocsFromSystem = systemLocais.filter((l: any) => l.tipo === 'VIATURA' && l.is_ativo !== false).map((l: any) => l.nome);
-  const allVtrLocations = Array.from(new Set([...defaultVtrLocs, ...vtrLocsFromSystem]));
+  // Compute available locations dynamically from dbLocais
+  const vtrLocsFromSystem = dbLocais.filter((l: any) => l.tipo === 'VIATURA').map((l: any) => l.nome);
+  const allVtrLocations = vtrLocsFromSystem.length > 0
+    ? Array.from(new Set(vtrLocsFromSystem))
+    : ['Telheiro 991', 'Estacionamento Alternativo ao Telheiro 991', 'Hangar 6', 'Oficial de Dia', 'Hotel Mirandela', 'Alojamento BA11'];
 
-  const defaultKeyLocs = ['Chaveiro 991', 'Logística', 'Oficial de Dia'];
-  const keyLocsFromSystem = systemLocais.filter((l: any) => l.tipo === 'CHAVE' && l.is_ativo !== false).map((l: any) => l.nome);
-  const allKeyLocations = Array.from(new Set([...defaultKeyLocs, ...keyLocsFromSystem]));
+  const keyLocsFromSystem = dbLocais.filter((l: any) => l.tipo === 'CHAVE').map((l: any) => l.nome);
+  const allKeyLocations = keyLocsFromSystem.length > 0
+    ? Array.from(new Set(keyLocsFromSystem))
+    : ['Chaveiro 991', 'Logística', 'Oficial de Dia'];
 
   const handleSelectLocalViaturaOption = (val: string) => {
     setSelectedLocalViaturaOption(val);
@@ -147,6 +141,15 @@ export default function AdminViaturasPage() {
   useEffect(() => {
     async function loadData() {
       try {
+        const storedLocs = getStoredLocais();
+        if (storedLocs.length > 0) {
+          setDbLocais(storedLocs.filter((l: any) => l.is_ativo !== false));
+        } else {
+          const { data: lData } = await supabase.from('locais').select('*');
+          const list = lData && lData.length > 0 ? lData : MOCK_LOCAIS;
+          setDbLocais(list.filter((l: any) => l.is_ativo !== false));
+        }
+
         const overrides = getFleetOverrides();
 
         const { data: vData } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
