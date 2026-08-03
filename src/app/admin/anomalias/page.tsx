@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Wrench, CheckCircle2, Shield, Image, MapPin } from 'lucide-react';
 import { supabase, Anomalia, Viatura } from '@/lib/supabase/client';
 import { MOCK_ANOMALIAS, MOCK_VIATURAS } from '@/lib/mock-data';
+import { getStoredAnomalias, saveStoredAnomalias } from '@/lib/utils/cookies';
 
 export default function AnomaliasPage() {
   const [anomalias, setAnomalias] = useState<Anomalia[]>([]);
@@ -15,12 +16,17 @@ export default function AnomaliasPage() {
     async function loadData() {
       try {
         const { data: aData } = await supabase.from('anomalias').select('*').order('created_at', { ascending: false });
-        const { data: vData } = await supabase.from('viaturas').select('*');
+        const { data: vData } = await supabase.from('anomalias').select('*');
 
-        setAnomalias(aData && aData.length > 0 ? aData : MOCK_ANOMALIAS);
+        const localAnomalias = getStoredAnomalias();
+        const baseAnomalias = localAnomalias.length > 0 ? localAnomalias : (aData && aData.length > 0 ? aData : MOCK_ANOMALIAS);
+
+        setAnomalias(baseAnomalias);
         setViaturas(vData && vData.length > 0 ? vData : MOCK_VIATURAS);
       } catch (err) {
         console.error(err);
+        const localAnomalias = getStoredAnomalias();
+        setAnomalias(localAnomalias.length > 0 ? localAnomalias : MOCK_ANOMALIAS);
       } finally {
         setLoading(false);
       }
@@ -31,7 +37,9 @@ export default function AnomaliasPage() {
   const updateEstadoAnomalia = async (id: string, novoEstado: 'PENDENTE' | 'EM_RESOLUCAO' | 'RESOLVIDO') => {
     try {
       await supabase.from('anomalias').update({ estado_anomalia: novoEstado }).eq('id', id);
-      setAnomalias(anomalias.map((a) => (a.id === id ? { ...a, estado_anomalia: novoEstado } : a)));
+      const updated = anomalias.map((a) => (a.id === id ? { ...a, estado_anomalia: novoEstado } : a));
+      setAnomalias(updated);
+      saveStoredAnomalias(updated);
     } catch (err) {
       console.error(err);
     }

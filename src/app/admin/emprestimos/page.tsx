@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Building, Camera, CheckCircle2, Shield, Calendar, User, Phone, Mail, FileText, AlertCircle, ArrowRight } from 'lucide-react';
 import { supabase, Viatura, EmprestimoExterno, FotoEmprestimo } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_EMPRESTIMOS, MOCK_FOTOS_EMPRESTIMO } from '@/lib/mock-data';
-import { POSTOS_FORCA_AEREA } from '@/lib/utils/cookies';
+import { POSTOS_FORCA_AEREA, getStoredEmprestimos, saveStoredEmprestimos } from '@/lib/utils/cookies';
 
 const ANGULOS_INSPECAO = [
   { id: 'FRENTE', label: '1. Frente / Para-choques *', req: true },
@@ -56,8 +56,11 @@ export default function EmprestimosPage() {
           return { ...v, km_atuais: km };
         });
 
+        const localEmp = getStoredEmprestimos();
+        const baseEmp = localEmp.length > 0 ? localEmp : (eData || []);
+
         setViaturas(rawFleet);
-        setEmprestimos(eData || []);
+        setEmprestimos(baseEmp);
         setFotos(fData || []);
 
         if (rawFleet.length > 0) {

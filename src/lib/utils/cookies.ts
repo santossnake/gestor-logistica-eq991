@@ -193,3 +193,121 @@ export const saveMilitaryProfile = (profile: MilitaryProfile): void => {
     console.error('Erro ao gravar perfil do militar:', err);
   }
 };
+
+// ==========================================
+// LOCAL PERSISTENCE FOR LOCAIS (Parking & Key Cabinets)
+// ==========================================
+const LOCAIS_STORAGE_KEY = 'eq991_locais_db_v2';
+
+export function getStoredLocais(): any[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAIS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export function saveStoredLocais(locais: any[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAIS_STORAGE_KEY, JSON.stringify(locais));
+  } catch (err) {
+    console.error('Erro ao guardar locais localmente:', err);
+  }
+}
+
+export function saveStoredLocal(item: any): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredLocais();
+    const updated = [item, ...current.filter((l) => l.id !== item.id)];
+    localStorage.setItem(LOCAIS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Erro ao guardar local:', err);
+  }
+}
+
+export function deleteStoredLocal(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredLocais();
+    const updated = current.filter((l) => l.id !== id);
+    localStorage.setItem(LOCAIS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Erro ao apagar local:', err);
+  }
+}
+
+// ==========================================
+// LOCAL PERSISTENCE FOR ANOMALIAS
+// ==========================================
+const ANOMALIAS_STORAGE_KEY = 'eq991_anomalias_db_v1';
+
+export function getStoredAnomalias(): any[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(ANOMALIAS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export function saveStoredAnomalias(anomalias: any[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(ANOMALIAS_STORAGE_KEY, JSON.stringify(anomalias));
+  } catch (err) {
+    console.error('Erro ao guardar anomalias localmente:', err);
+  }
+}
+
+// ==========================================
+// LOCAL PERSISTENCE FOR UTILIZADORES
+// ==========================================
+const UTILIZADORES_STORAGE_KEY = 'eq991_utilizadores_db_v1';
+
+export function getStoredUtilizadores(): any[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(UTILIZADORES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export function saveStoredUtilizadores(utilizadores: any[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(UTILIZADORES_STORAGE_KEY, JSON.stringify(utilizadores));
+  } catch (err) {
+    console.error('Erro ao guardar utilizadores localmente:', err);
+  }
+}
+
+// ==========================================
+// LOCAL PERSISTENCE FOR EMPRESTIMOS
+// ==========================================
+const EMPRESTIMOS_STORAGE_KEY = 'eq991_emprestimos_db_v1';
+
+export function getStoredEmprestimos(): any[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(EMPRESTIMOS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export function saveStoredEmprestimos(emprestimos: any[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(EMPRESTIMOS_STORAGE_KEY, JSON.stringify(emprestimos));
+  } catch (err) {
+    console.error('Erro ao guardar empréstimos localmente:', err);
+  }
+}

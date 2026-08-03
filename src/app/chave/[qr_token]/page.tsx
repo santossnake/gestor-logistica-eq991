@@ -28,7 +28,7 @@ import {
   Building2,
   LocateFixed
 } from 'lucide-react';
-import { getStoredMilitaryProfile, saveMilitaryProfile, saveFleetOverride, getFleetOverrides, MilitaryProfile } from '@/lib/utils/cookies';
+import { getStoredMilitaryProfile, saveMilitaryProfile, saveFleetOverride, getFleetOverrides, getStoredLocais, MilitaryProfile } from '@/lib/utils/cookies';
 import { supabase, Viatura, LocalItem, RegistoMarcha } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_LOCAIS, MOCK_MARCHAS } from '@/lib/mock-data';
 import { LiveGpsTracker } from '@/components/LiveGpsTracker';
@@ -127,15 +127,19 @@ export default function ChavePage() {
           setNecessitaLimpeza(vData.necessita_limpeza);
         }
 
-        const { data: lData } = await supabase.from('locais').select('*').eq('is_ativo', true);
-        if (lData && lData.length > 0) {
-          const chaves = lData.filter((l) => l.tipo === 'CHAVE');
-          const vtrs = lData.filter((l) => l.tipo === 'VIATURA');
+        const { data: lData } = await supabase.from('locais').select('*');
+        const storedLocs = getStoredLocais();
+        const rawLocais = storedLocs.length > 0 ? storedLocs : (lData && lData.length > 0 ? lData : MOCK_LOCAIS);
+        const activeLocais = rawLocais.filter((l: any) => l.is_ativo !== false);
+
+        if (activeLocais.length > 0) {
+          const chaves = activeLocais.filter((l: any) => l.tipo === 'CHAVE');
+          const vtrs = activeLocais.filter((l: any) => l.tipo === 'VIATURA');
           setLocaisChave(chaves);
           setLocaisViatura(vtrs);
 
-          const defChave = chaves.find((c) => c.is_predefinido) || chaves[0];
-          const defVtr = vtrs.find((v) => v.is_predefinido) || vtrs[0];
+          const defChave = chaves.find((c: any) => c.is_predefinido) || chaves[0];
+          const defVtr = vtrs.find((v: any) => v.is_predefinido) || vtrs[0];
           if (defChave) setLocChaveSelected(defChave.nome);
           if (defVtr) setLocViaturaSelected(defVtr.nome);
         }

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Key, Plus, CheckCircle2, Shield, Trash2, Edit2, Sparkles, AlertCircle } from 'lucide-react';
 import { supabase, LocalItem } from '@/lib/supabase/client';
 import { MOCK_LOCAIS } from '@/lib/mock-data';
+import { getStoredLocais, saveStoredLocais } from '@/lib/utils/cookies';
 
 export default function LocaisAdminPage() {
   const [locais, setLocais] = useState<LocalItem[]>([]);
@@ -23,11 +24,19 @@ export default function LocaisAdminPage() {
   useEffect(() => {
     async function fetchLocais() {
       try {
-        const { data } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
-        setLocais(data && data.length > 0 ? data : MOCK_LOCAIS);
+        const stored = getStoredLocais();
+        if (stored && stored.length > 0) {
+          setLocais(stored);
+        } else {
+          const { data } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
+          const list = data && data.length > 0 ? data : MOCK_LOCAIS;
+          setLocais(list);
+          saveStoredLocais(list);
+        }
       } catch (err) {
         console.error(err);
-        setLocais(MOCK_LOCAIS);
+        const stored = getStoredLocais();
+        setLocais(stored.length > 0 ? stored : MOCK_LOCAIS);
       } finally {
         setLoading(false);
       }
@@ -61,10 +70,11 @@ export default function LocaisAdminPage() {
     setSuccessMsg('');
 
     try {
-      // If setting as predefinido, unset on other items of same type
       if (isPredefinidoInput) {
         await supabase.from('locais').update({ is_predefinido: false }).eq('tipo', tipoInput);
       }
+
+      let updatedList: LocalItem[] = [];
 
       if (editingId) {
         // EDIT existing location
@@ -76,17 +86,15 @@ export default function LocaisAdminPage() {
 
         await supabase.from('locais').update(payload).eq('id', editingId);
 
-        setLocais((prev) =>
-          prev.map((l) => {
-            if (l.id === editingId) {
-              return { ...l, ...payload };
-            }
-            if (isPredefinidoInput && l.tipo === tipoInput) {
-              return { ...l, is_predefinido: false };
-            }
-            return l;
-          })
-        );
+        updatedList = locais.map((l) => {
+          if (l.id === editingId) {
+            return { ...l, ...payload };
+          }
+          if (isPredefinidoInput && l.tipo === tipoInput) {
+            return { ...l, is_predefinido: false };
+          }
+          return l;
+        });
 
         setSuccessMsg(`Local "${nomeInput}" atualizado com sucesso!`);
       } else {
@@ -101,14 +109,16 @@ export default function LocaisAdminPage() {
         const { data } = await supabase.from('locais').insert([payload]).select();
         const created = data && data.length > 0 ? data[0] : { id: `loc-${Date.now()}`, ...payload };
 
-        setLocais((prev) => [
-          ...prev.map((l) => (isPredefinidoInput && l.tipo === tipoInput ? { ...l, is_predefinido: false } : l)),
+        updatedList = [
+          ...locais.map((l) => (isPredefinidoInput && l.tipo === tipoInput ? { ...l, is_predefinido: false } : l)),
           created
-        ]);
+        ];
 
         setSuccessMsg(`Novo local "${nomeInput}" adicionado com sucesso!`);
       }
 
+      setLocais(updatedList);
+      saveStoredLocais(updatedList);
       setIsModalOpen(false);
     } catch (err: any) {
       console.error(err);
@@ -121,7 +131,9 @@ export default function LocaisAdminPage() {
 
     try {
       await supabase.from('locais').delete().eq('id', id);
-      setLocais((prev) => prev.filter((l) => l.id !== id));
+      const updatedList = locais.filter((l) => l.id !== id);
+      setLocais(updatedList);
+      saveStoredLocais(updatedList);
       setSuccessMsg(`Local "${nome}" removido com sucesso.`);
     } catch (err) {
       console.error(err);
@@ -131,7 +143,9 @@ export default function LocaisAdminPage() {
   const toggleAtivo = async (id: string, currentAtivo: boolean) => {
     try {
       await supabase.from('locais').update({ is_ativo: !currentAtivo }).eq('id', id);
-      setLocais((prev) => prev.map((l) => (l.id === id ? { ...l, is_ativo: !currentAtivo } : l)));
+      const updatedList = locais.map((l) => (l.id === id ? { ...l, is_ativo: !currentAtivo } : l));
+      setLocais(updatedList);
+      saveStoredLocais(updatedList);
     } catch (err) {
       console.error(err);
     }
