@@ -332,44 +332,7 @@ export function getStoredAuditLogs(): AuditLogItem[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(AUDIT_LOGS_STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-
-    // Initial default logs if empty
-    const defaultLogs: AuditLogItem[] = [
-      {
-        id: 'aud-101',
-        timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
-        trigrama: 'OLV',
-        nome: 'Manuel Oliveira',
-        posto: 'TEN',
-        categoria: 'RESERVAS',
-        acao: 'Aprovação de Pedido',
-        detalhes: 'Pedido aprovado para Sintra com atribuição da viatura AM-96-11 (98.620 KM).'
-      },
-      {
-        id: 'aud-102',
-        timestamp: new Date(Date.now() - 3600000 * 5).toISOString(),
-        trigrama: 'SIL',
-        nome: 'João Silva',
-        posto: '1SAR',
-        categoria: 'VIATURAS',
-        acao: 'Registo de Abastecimento',
-        detalhes: 'Abastecimento de 50L registado na viatura AM-96-12 (BA2 - Ota).'
-      },
-      {
-        id: 'aud-103',
-        timestamp: new Date(Date.now() - 3600000 * 12).toISOString(),
-        trigrama: 'FER',
-        nome: 'Pedro Ferreira',
-        posto: 'CAP',
-        categoria: 'LOCAIS',
-        acao: 'Atualização de Parque/Chaveiro',
-        detalhes: 'Locais sincronizados: Telheiro 991 e Chaveiro 991.'
-      }
-    ];
-
-    localStorage.setItem(AUDIT_LOGS_STORAGE_KEY, JSON.stringify(defaultLogs));
-    return defaultLogs;
+    return raw ? JSON.parse(raw) : [];
   } catch (err) {
     return [];
   }

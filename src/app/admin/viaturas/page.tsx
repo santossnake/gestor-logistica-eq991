@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { supabase, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_GPS, MOCK_LOCAIS } from '@/lib/mock-data';
-import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride, getStoredLocais } from '@/lib/utils/cookies';
+import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride, getStoredLocais, logAuditAction } from '@/lib/utils/cookies';
 
 const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false });
 
@@ -291,8 +291,12 @@ export default function AdminViaturasPage() {
           prev.map((v) => (v.id === targetVtrForRefuel.id ? { ...v, km_atuais: abastKm } : v))
         );
       }
-
       alert(`Abastecimento de ${abastLitros}L registado na viatura ${targetVtrForRefuel.matricula}!`);
+      logAuditAction(
+        'VIATURAS',
+        'Abastecimento Logística',
+        `Registo de abastecimento de ${abastLitros}L (${abastValor}€) na viatura ${targetVtrForRefuel.matricula} aos ${abastKm} KM.`
+      );
       setShowRefuelModal(false);
     } catch (err) {
       console.error(err);
@@ -321,6 +325,13 @@ export default function AdminViaturasPage() {
           if (newStatus) return { ...item, is_forcada_recomendada: false };
           return item;
         })
+      );
+
+      saveFleetOverride(v.id, { is_forcada_recomendada: newStatus });
+      logAuditAction(
+        'VIATURAS',
+        'Prioridade Viatura Recomendada',
+        `${newStatus ? 'Definida' : 'Removida'} prioridade forçada para a viatura ${v.matricula}.`
       );
     } catch (err) {
       console.error(err);
@@ -418,16 +429,22 @@ export default function AdminViaturasPage() {
         setViaturas((prev) => prev.map((v) => (v.id === editingViatura.id ? { ...v, ...vData } : v)));
       } else {
         const newRecord = {
-          ...vData,
-          estado: 'DISPONIVEL',
-          necessita_limpeza: false,
+          id: `vtr-${Date.now()}`,
           qr_code_token: newToken,
-          is_forcada_recomendada: false
+          estado: 'DISPONIVEL',
+          is_forcada_recomendada: false,
+          ...vData
         };
-        const { data } = await supabase.from('viaturas').insert([newRecord]).select();
-        const created = data && data.length > 0 ? data[0] : { id: `vtr-${Date.now()}`, ...newRecord };
-        setViaturas((prev) => [...prev, created]);
+        await supabase.from('viaturas').insert([newRecord]);
+        setViaturas((prev) => [...prev, newRecord as any]);
       }
+
+      logAuditAction(
+        'VIATURAS',
+        'Atualização de Frota',
+        `Atualizados dados/odómetro da viatura ${vData.matricula} (${vData.km_atuais} KM, local viatura: ${vData.localizacao_atual_viatura}, chave: ${vData.localizacao_atual_chave}).`
+      );
+
       setIsModalOpen(false);
     } catch (err) {
       console.error(err);

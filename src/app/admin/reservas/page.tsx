@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { supabase, Pedido, Viatura } from '@/lib/supabase/client';
 import { MOCK_VIATURAS } from '@/lib/mock-data';
-import { getStoredPedidos, saveStoredPedido, POSTOS_FORCA_AEREA, saveFleetOverride, updateStoredPedido, deleteStoredPedido, isReservationOverlapping } from '@/lib/utils/cookies';
+import { getStoredPedidos, saveStoredPedido, POSTOS_FORCA_AEREA, saveFleetOverride, updateStoredPedido, deleteStoredPedido, isReservationOverlapping, logAuditAction } from '@/lib/utils/cookies';
 
 export default function AdminReservasPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -215,6 +215,7 @@ export default function AdminReservasPage() {
         }
 
         setSuccessMsg(`Reserva de ${nomeUtilizador} [${nip}] atualizada com sucesso!`);
+        logAuditAction('RESERVAS', 'Edição de Reserva', `Atualizada a reserva de ${nomeUtilizador} [NIP: ${nip}] com destino a ${destino}.`);
       } else {
         // CREATE new reservation
         const { data } = await supabase.from('pedidos').insert([payload]).select();
@@ -232,6 +233,7 @@ export default function AdminReservasPage() {
         }
 
         setSuccessMsg(`Nova reserva para ${nomeUtilizador} criada com sucesso!`);
+        logAuditAction('RESERVAS', 'Criação de Reserva', `Criada nova reserva para ${nomeUtilizador} [NIP: ${nip}] com destino a ${destino}.`);
       }
 
       setIsModalOpen(false);
@@ -261,6 +263,7 @@ export default function AdminReservasPage() {
       }
 
       setSuccessMsg(`Reserva de ${nome} eliminada com sucesso.`);
+      logAuditAction('RESERVAS', 'Eliminação de Reserva', `Apagada permanentemente a reserva de "${nome}".`);
     } catch (err) {
       console.error(err);
     }

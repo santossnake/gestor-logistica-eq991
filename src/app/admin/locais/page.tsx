@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Key, Plus, CheckCircle2, Shield, Trash2, Edit2, Sparkles, AlertCircle } from 'lucide-react';
 import { supabase, LocalItem } from '@/lib/supabase/client';
 import { MOCK_LOCAIS } from '@/lib/mock-data';
-import { getStoredLocais, saveStoredLocais } from '@/lib/utils/cookies';
+import { getStoredLocais, saveStoredLocais, logAuditAction } from '@/lib/utils/cookies';
 
 export default function LocaisAdminPage() {
   const [locais, setLocais] = useState<LocalItem[]>([]);
@@ -97,6 +97,7 @@ export default function LocaisAdminPage() {
         });
 
         setSuccessMsg(`Local "${nomeInput}" atualizado com sucesso!`);
+        logAuditAction('LOCAIS', 'Edição de Local', `Atualizado o local [${tipoInput}] "${nomeInput}".`);
       } else {
         // CREATE new location
         const payload = {
@@ -115,6 +116,7 @@ export default function LocaisAdminPage() {
         ];
 
         setSuccessMsg(`Novo local "${nomeInput}" adicionado com sucesso!`);
+        logAuditAction('LOCAIS', 'Criação de Local', `Adicionado o local [${tipoInput}] "${nomeInput}".`);
       }
 
       setLocais(updatedList);
@@ -135,6 +137,7 @@ export default function LocaisAdminPage() {
       setLocais(updatedList);
       saveStoredLocais(updatedList);
       setSuccessMsg(`Local "${nome}" removido com sucesso.`);
+      logAuditAction('LOCAIS', 'Eliminação de Local', `Apagado o local "${nome}".`);
     } catch (err) {
       console.error(err);
     }
@@ -146,6 +149,8 @@ export default function LocaisAdminPage() {
       const updatedList = locais.map((l) => (l.id === id ? { ...l, is_ativo: !currentAtivo } : l));
       setLocais(updatedList);
       saveStoredLocais(updatedList);
+      const targetLocal = locais.find((l) => l.id === id);
+      logAuditAction('LOCAIS', 'Alteração de Estado de Local', `${!currentAtivo ? 'Ativado' : 'Desativado'} o local "${targetLocal?.nome || id}".`);
     } catch (err) {
       console.error(err);
     }
