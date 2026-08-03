@@ -24,13 +24,20 @@ export async function POST(request: Request) {
         break;
 
       case 'APROVACAO_PEDIDO':
+        const linkMarcha = body.linkMarcha || (body.qrToken ? `http://localhost:3000/chave/${body.qrToken}` : 'http://localhost:3000/recomendada');
         subject = 'Esquadra 991 - Pedido de Viatura APROVADO';
         htmlContent = `
           <h2>Esquadra 991 - Força Aérea Portuguesa</h2>
           <p>Exmo. Militar ${nome},</p>
           <p>Informamos que o seu pedido de viatura com destino a <strong>${destino}</strong> foi <span style="color: #16a34a; font-weight: bold;">APROVADO</span>.</p>
           <p>Viatura Atribuída: <strong>${matricula || 'Nissan Navara 4x4'}</strong></p>
-          <p>À chegada ao chaveiro, digitalize o QR Code do porta-chaves ou utilize a opção "Viatura Recomendada".</p>
+          
+          <div style="margin: 20px 0; padding: 16px; background-color: #0f172a; border-radius: 12px; border: 2px solid #10b981; text-align: center;">
+            <p style="color: #f8fafc; font-size: 14px; margin-bottom: 12px; font-weight: bold;">Proceder ao Levantamento Digital & Início de Marcha:</p>
+            <a href="${linkMarcha}" style="display: inline-block; background-color: #059669; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-family: monospace; font-size: 14px; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);">🚀 Iniciar Marcha da Viatura (${matricula || 'Navara'})</a>
+          </div>
+          
+          <p style="font-size: 11px; color: #94a3b8;">Link direto: <a href="${linkMarcha}" style="color: #10b981;">${linkMarcha}</a></p>
         `;
         break;
 

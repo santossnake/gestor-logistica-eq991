@@ -19,7 +19,7 @@ export default function MapView({ viaturas, selectedViaturaId, onSelectViatura }
   if (!mounted) {
     return (
       <div className="w-full h-80 rounded-xl bg-slate-900 flex items-center justify-center text-slate-500 text-sm font-mono">
-        A carregar mapa da frota (Base Aérea da Ota: 39.094, -8.967)...
+        A carregar mapa da frota (Coordenadas Ota: 39.092, -8.968)...
       </div>
     );
   }
@@ -37,55 +37,65 @@ export default function MapView({ viaturas, selectedViaturaId, onSelectViatura }
     return matricula.slice(-2);
   };
 
-  // Custom square marker icon creator
+  // Custom square marker icon creator reflecting real-time operational status
   const createCustomSquareIcon = (estado: string, matricula: string, necessitaLimpeza?: boolean) => {
-    let bgColor = '#22c55e'; // Green for DISPONIVEL
-    if (estado === 'EM_USO') {
+    let bgColor = '#22c55e'; // Emerald green for DISPONIVEL & clean
+    let badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#10b981; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">✓</span>';
+
+    if (necessitaLimpeza) {
+      bgColor = '#f59e0b'; // Amber for cleaning needed
+      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#d97706; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px;">🧼</span>';
+    } else if (estado === 'RESERVADA') {
+      bgColor = '#d97706'; // Amber/Orange for RESERVADA
+      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#b45309; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px;">📅</span>';
+    } else if (estado === 'EM_USO') {
       bgColor = '#3b82f6'; // Blue for EM_USO
+      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#1d4ed8; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px;">🚗</span>';
     } else if (estado === 'MANUTENCAO' || estado === 'EMPRESTADA_EXTERNO') {
-      bgColor = '#ef4444'; // Red for indisponível
+      bgColor = '#ef4444'; // Red for indisponível / anomalia
+      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#b91c1c; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px;">⚠️</span>';
     }
 
     const digits = getLastTwoDigits(matricula);
-    const borderStyle = necessitaLimpeza ? '3px dashed #f59e0b' : '2px solid #ffffff';
+    const borderStyle = necessitaLimpeza ? '3px dashed #fbbf24' : '2px solid #ffffff';
 
     return L.divIcon({
       className: 'custom-square-pin',
       html: `
         <div style="
           background-color: ${bgColor};
-          width: 34px;
-          height: 34px;
-          border-radius: 6px;
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
           border: ${borderStyle};
-          box-shadow: 0 0 10px ${bgColor};
+          box-shadow: 0 0 12px ${bgColor};
           display: flex;
           align-items: center;
           justify-content: center;
           color: #ffffff;
           font-family: monospace;
           font-weight: 900;
-          font-size: 14px;
+          font-size: 15px;
           position: relative;
         ">
           ${digits}
-          ${necessitaLimpeza ? '<span style="position:absolute; top:-6px; right:-6px; background:#f59e0b; width:12px; height:12px; border-radius:50%; border:1px solid #000;"></span>' : ''}
+          ${badgeHtml}
         </div>
       `,
-      iconSize: [34, 34],
-      iconAnchor: [17, 17]
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
     });
   };
 
-  // Exact requested default map center: [39.094, -8.967]
-  const otaCenter = [39.094, -8.967];
+  // Center map at exact coordinates requested: [39.092, -8.968]
+  const otaCenter = [39.092, -8.968];
 
   return (
     <div className="w-full h-96 rounded-xl overflow-hidden border border-slate-800 shadow-2xl relative">
       {/* @ts-ignore */}
       <MapContainer
         center={otaCenter}
-        zoom={14}
+        zoom={15}
         scrollWheelZoom={true}
         className="w-full h-full"
       >
@@ -95,8 +105,8 @@ export default function MapView({ viaturas, selectedViaturaId, onSelectViatura }
         />
 
         {viaturas.map((v) => {
-          const lat = v.latitude_atual || 39.094;
-          const lng = v.longitude_atual || -8.967;
+          const lat = v.latitude_atual || 39.092;
+          const lng = v.longitude_atual || -8.968;
 
           return (
             <Marker
@@ -108,24 +118,31 @@ export default function MapView({ viaturas, selectedViaturaId, onSelectViatura }
               }}
             >
               <Popup>
-                <div className="text-xs space-y-1.5 p-1">
+                <div className="text-xs space-y-1.5 p-1 font-mono">
                   <div className="font-bold text-slate-100 flex items-center justify-between">
-                    <span>{v.matricula}</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-emerald-400 font-mono font-bold">
+                    <span className="text-sm font-black">{v.matricula}</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-900 text-emerald-400 font-bold border border-emerald-500/40">
                       {v.estado}
                     </span>
                   </div>
-                  <p className="text-slate-300 font-semibold">{v.modelo}</p>
+                  <p className="text-slate-300 font-bold">{v.modelo}</p>
                   
-                  {v.necessita_limpeza && (
-                    <div className="px-2 py-1 rounded bg-amber-950/80 border border-amber-500/50 text-amber-300 font-bold text-[11px] flex items-center space-x-1">
+                  {v.necessita_limpeza ? (
+                    <div className="px-2 py-1 rounded bg-amber-950/90 border border-amber-500/60 text-amber-300 font-bold text-[11px] flex items-center space-x-1">
                       <span>🧼 NECESSITA DE LIMPEZA</span>
+                    </div>
+                  ) : (
+                    <div className="px-2 py-1 rounded bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 font-bold text-[11px] flex items-center space-x-1">
+                      <span>✨ OPERACIONAL & LIMPA</span>
                     </div>
                   )}
 
-                  <p className="text-slate-400">Odómetro: {v.km_atuais.toLocaleString()} km</p>
-                  <p className="text-slate-400">Parque: {v.localizacao_atual_viatura}</p>
-                  <p className="text-slate-400">Chaveiro: {v.localizacao_atual_chave}</p>
+                  <div className="text-slate-400 text-[11px] space-y-0.5 pt-1 border-t border-slate-800">
+                    <p>Odómetro: <strong className="text-amber-300">{v.km_atuais.toLocaleString()} km</strong></p>
+                    <p>Parque Viatura: <strong className="text-slate-200">{v.localizacao_atual_viatura}</strong></p>
+                    <p>Local Chaveiro: <strong className="text-slate-200">{v.localizacao_atual_chave}</strong></p>
+                    <p>Coordenadas: <strong className="text-emerald-400">{lat.toFixed(5)}, {lng.toFixed(5)}</strong></p>
+                  </div>
                 </div>
               </Popup>
             </Marker>

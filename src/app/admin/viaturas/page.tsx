@@ -417,8 +417,8 @@ export default function AdminViaturasPage() {
       localizacao_atual_chave: localChave,
       km_proxima_revisao: kmProximaRevisao,
       data_proxima_revisao: dataProximaRevisao,
-      latitude_atual: 39.0940,
-      longitude_atual: -8.9670
+      latitude_atual: 39.0920,
+      longitude_atual: -8.9680
     };
 
     saveFleetOverride(editingViatura ? editingViatura.id : newToken, vData);

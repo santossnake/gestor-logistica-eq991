@@ -156,6 +156,9 @@ export default function AdminDashboardPage() {
         prev.map((v) => (v.id === selectedViaturaIdForApproval ? { ...v, estado: 'RESERVADA' } : v))
       );
 
+      const qrToken = assignedVtr?.qr_code_token || 'VTR-991-01';
+      const linkMarcha = typeof window !== 'undefined' ? `${window.location.origin}/chave/${qrToken}` : `http://localhost:3000/chave/${qrToken}`;
+
       // 3. Dispatch Email notification to applicant
       fetch('/api/emails', {
         method: 'POST',
@@ -165,7 +168,9 @@ export default function AdminDashboardPage() {
           emailDestinatario: approvingPedido.email,
           nome: approvingPedido.nome_utilizador,
           destino: approvingPedido.destino,
-          matricula: assignedVtr?.matricula || 'Nissan Navara 4x4'
+          matricula: assignedVtr?.matricula || 'Nissan Navara 4x4',
+          qrToken,
+          linkMarcha
         })
       }).catch(console.error);
 

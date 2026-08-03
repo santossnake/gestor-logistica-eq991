@@ -393,7 +393,7 @@ export default function AdminReservasPage() {
                         href={`mailto:${p.email}?subject=${encodeURIComponent(
                           `Esquadra 991 - Notificação de Reserva [${p.destino}] - Viatura ${assignedVtr ? assignedVtr.matricula : 'Sem Viatura Atribuída'}`
                         )}&body=${encodeURIComponent(
-                          `Exmo. Militar ${p.posto} ${p.nome_utilizador} [NIP ${p.nip}],\n\nInformamos que o seu pedido de reserva de viatura para o destino ${p.destino} encontra-se com o estado: ${p.estado_pedido}.\n\nViatura Atribuída: ${assignedVtr ? `${assignedVtr.matricula} (${assignedVtr.modelo})` : 'A atribuir pela Logística'}\nPeríodo: ${new Date(p.data_inicio).toLocaleString()} até ${new Date(p.data_fim).toLocaleString()}\nMotivo: ${p.motivo}\n\nCumprimentos,\nLogística Esquadra 991`
+                          `Exmo. Militar ${p.posto} ${p.nome_utilizador} [NIP ${p.nip}],\n\nInformamos que o seu pedido de reserva de viatura para o destino ${p.destino} encontra-se com o estado: ${p.estado_pedido}.\n\nViatura Atribuída: ${assignedVtr ? `${assignedVtr.matricula} (${assignedVtr.modelo})` : 'A atribuir pela Logística'}\n\n🚀 PARA INICIAR A MARCHA E LEVANTAR A CHAVE DA VIATURA ACEDA A:\n${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/chave/${assignedVtr?.qr_code_token || 'VTR-991-01'}\n\nPeríodo: ${new Date(p.data_inicio).toLocaleString()} até ${new Date(p.data_fim).toLocaleString()}\nMotivo: ${p.motivo}\n\nCumprimentos,\nLogística Esquadra 991`
                         )}`}
                         target="_blank"
                         rel="noreferrer"
