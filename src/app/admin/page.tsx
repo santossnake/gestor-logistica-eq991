@@ -8,6 +8,8 @@ import { MOCK_VIATURAS, MOCK_PEDIDOS } from '@/lib/mock-data';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
+import { getStoredPedidos } from '@/lib/utils/cookies';
+
 export default function AdminDashboardPage() {
   const [viaturas, setViaturas] = useState<Viatura[]>([]);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -19,12 +21,23 @@ export default function AdminDashboardPage() {
         const { data: vData } = await supabase.from('viaturas').select('*');
         const { data: pData } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
 
+        const localStored = getStoredPedidos();
+        const dbPedidos: Pedido[] = pData || [];
+        
+        // Merge Supabase requests with local stored requests without duplicates
+        const combined = [...dbPedidos];
+        for (const loc of localStored) {
+          if (!combined.some((p) => p.id === loc.id || (p.nip === loc.nip && p.created_at === loc.created_at))) {
+            combined.push(loc);
+          }
+        }
+
         setViaturas(vData && vData.length > 0 ? vData : MOCK_VIATURAS);
-        setPedidos(pData && pData.length > 0 ? pData : MOCK_PEDIDOS);
+        setPedidos(combined);
       } catch (err) {
         console.error(err);
         setViaturas(MOCK_VIATURAS);
-        setPedidos(MOCK_PEDIDOS);
+        setPedidos(getStoredPedidos());
       } finally {
         setLoading(false);
       }

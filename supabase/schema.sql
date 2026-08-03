@@ -202,8 +202,8 @@ INSERT INTO public.viaturas (matricula, modelo, num_lugares, tem_gancho_reboque,
 ('AM-96-12', 'Nissan Navara 4x4', 5, true, 105888, 'DISPONIVEL', false, 'Telheiro 991', 'Chaveiro 991', 39.0945, -8.9675, 'VTR-991-02', false, 110000, '2027-08-02'),
 ('AM-96-13', 'Nissan Navara 4x4', 5, true, 102614, 'DISPONIVEL', false, 'Telheiro 991', 'Chaveiro 991', 39.0935, -8.9665, 'VTR-991-03', false, 110000, '2027-08-02');
 
--- Add maintenance date column if not exists
-ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS data_proxima_revisao TIMESTAMP WITH TIME ZONE;
+-- Purge all existing vehicle booking requests
+DELETE FROM public.pedidos;
 
 -- Add cleaning columns to viaturas if not exists
 ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS data_ultima_limpeza TIMESTAMP WITH TIME ZONE;

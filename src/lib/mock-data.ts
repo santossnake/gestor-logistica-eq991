@@ -111,23 +111,7 @@ export const MOCK_LOCAIS: LocalItem[] = [
   { id: 'loc-09', nome: 'Oficial de Dia', tipo: 'CHAVE', is_predefinido: false, is_ativo: true }
 ];
 
-export const MOCK_PEDIDOS: Pedido[] = [
-  {
-    id: 'ped-101',
-    nome_utilizador: 'Tenente Silva',
-    nip: '134890-A',
-    posto: 'Tenente',
-    email: 'silva.134890@emfa.pt',
-    data_inicio: new Date(Date.now() + 3600000).toISOString(),
-    data_fim: new Date(Date.now() + 28800000).toISOString(),
-    destino: 'Base Aérea Nº 1 - Sintra',
-    motivo: 'Transporte de material logístico e equipamentos de voo',
-    necessita_reboque: true,
-    viatura_id: 'vtr-001',
-    estado_pedido: 'PENDENTE',
-    created_at: new Date().toISOString()
-  }
-];
+export const MOCK_PEDIDOS: Pedido[] = [];
 
 export const MOCK_MARCHAS: RegistoMarcha[] = [
   {

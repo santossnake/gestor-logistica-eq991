@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, FileText, User, Mail, Shield, Truck, CheckCircle2, AlertCircle } from 'lucide-react';
-import { getStoredMilitaryProfile, saveMilitaryProfile, MilitaryProfile, POSTOS_FORCA_AEREA } from '@/lib/utils/cookies';
+import { getStoredMilitaryProfile, saveMilitaryProfile, MilitaryProfile, POSTOS_FORCA_AEREA, saveStoredPedido } from '@/lib/utils/cookies';
 import { supabase, Pedido } from '@/lib/supabase/client';
-import { MOCK_PEDIDOS } from '@/lib/mock-data';
 
 export default function PedidoPage() {
   const [profile, setProfile] = useState<MilitaryProfile>({
@@ -48,7 +47,7 @@ export default function PedidoPage() {
     // 1. Update stored profile cookie
     saveMilitaryProfile(profile);
 
-    // 2. Insert request into Supabase
+    // 2. Insert request into Supabase Database and Local Storage
     try {
       const payload = {
         nome_utilizador: profile.nome,
@@ -65,15 +64,14 @@ export default function PedidoPage() {
 
       const { data, error } = await supabase.from('pedidos').insert([payload]).select();
 
-      if (error) {
-        console.warn('Fallback para modo mock local:', error.message);
-        MOCK_PEDIDOS.push({
-          id: `ped-${Date.now()}`,
-          ...payload,
-          estado_pedido: 'PENDENTE',
-          created_at: new Date().toISOString()
-        });
-      }
+      const createdPedido = data && data.length > 0 ? data[0] : {
+        id: `ped-${Date.now()}`,
+        ...payload,
+        created_at: new Date().toISOString()
+      };
+
+      // Save into local storage for immediate persistence
+      saveStoredPedido(createdPedido);
 
       // 3. Trigger confirmation email via API Route
       try {

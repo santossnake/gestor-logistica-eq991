@@ -56,6 +56,39 @@ export const getStoredMilitaryProfile = (): MilitaryProfile => {
   return { nip: '', nome: '', posto: '', email: '' };
 };
 
+// Local Pedidos Persistence
+const PEDIDOS_STORAGE_KEY = 'eq991_pedidos_db_v1';
+
+export function getStoredPedidos(): any[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(PEDIDOS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export function saveStoredPedido(pedido: any) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredPedidos();
+    const updated = [pedido, ...current];
+    localStorage.setItem(PEDIDOS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Erro ao guardar pedido localmente:', err);
+  }
+}
+
+export function clearStoredPedidos() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(PEDIDOS_STORAGE_KEY);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 // Local Fleet Overrides Persistence (v3 reset to strictly enforce real > 90k KM)
 const FLEET_OVERRIDES_KEY = 'eq991_fleet_overrides_v3';
 
