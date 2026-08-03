@@ -388,16 +388,17 @@ export default function AdminReservasPage() {
 
                       <a
                         href={`mailto:${p.email}?subject=${encodeURIComponent(
-                          `Esquadra 991 - Notificação da Reserva [${p.destino}]`
+                          `Esquadra 991 - Notificação de Reserva [${p.destino}] - Viatura ${assignedVtr ? assignedVtr.matricula : 'Sem Viatura Atribuída'}`
                         )}&body=${encodeURIComponent(
-                          `Exmo. Militar ${p.posto} ${p.nome_utilizador} [NIP ${p.nip}],\n\nInformamos que o seu pedido de reserva de viatura para o destino ${p.destino} foi processado com o estado: ${p.estado_pedido}.\n\nCumprimentos,\nLogística Esquadra 991`
+                          `Exmo. Militar ${p.posto} ${p.nome_utilizador} [NIP ${p.nip}],\n\nInformamos que o seu pedido de reserva de viatura para o destino ${p.destino} encontra-se com o estado: ${p.estado_pedido}.\n\nViatura Atribuída: ${assignedVtr ? `${assignedVtr.matricula} (${assignedVtr.modelo})` : 'A atribuir pela Logística'}\nPeríodo: ${new Date(p.data_inicio).toLocaleString()} até ${new Date(p.data_fim).toLocaleString()}\nMotivo: ${p.motivo}\n\nCumprimentos,\nLogística Esquadra 991`
                         )}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-2 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-800 flex items-center space-x-1"
-                        title="Enviar Email de Notificação ao Requerente"
+                        className="px-2.5 py-1.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-800 flex items-center space-x-1.5 font-mono text-xs font-semibold transition-colors"
+                        title={`Enviar Email ao Requerente (Viatura: ${assignedVtr ? assignedVtr.matricula : 'Sem Viatura Atribuída'})`}
                       >
-                        <Mail className="w-4 h-4" />
+                        <Mail className="w-3.5 h-3.5 text-blue-400" />
+                        <span>{assignedVtr ? `Email (${assignedVtr.matricula})` : 'Email (Notificar)'}</span>
                       </a>
 
                       <button
