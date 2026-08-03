@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Key, MapPin, UserCheck, Map, AlertTriangle, FileText, QrCode, Building, Car, Calendar } from 'lucide-react';
+import { LayoutDashboard, Key, MapPin, UserCheck, Map, AlertTriangle, FileText, QrCode, Building, Car, Calendar, ShieldCheck } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -19,6 +19,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Locais Parque/Chaveiro', href: '/admin/locais', icon: MapPin },
     { name: 'Anomalias & Gravidade', href: '/admin/anomalias', icon: AlertTriangle },
     { name: 'Relatórios & Estatísticas', href: '/admin/relatorios', icon: FileText },
+    { name: 'Log de Auditoria', href: '/admin/auditoria', icon: ShieldCheck },
     { name: 'Gerador QR / NFC', href: '/admin/qrcodes', icon: QrCode },
   ];
 

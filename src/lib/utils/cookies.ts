@@ -311,3 +311,93 @@ export function saveStoredEmprestimos(emprestimos: any[]): void {
     console.error('Erro ao guardar empréstimos localmente:', err);
   }
 }
+
+// ==========================================
+// AUDIT LOG PERSISTENCE & SYSTEM LOGGING
+// ==========================================
+export interface AuditLogItem {
+  id: string;
+  timestamp: string;
+  trigrama: string;
+  nome: string;
+  posto: string;
+  categoria: 'RESERVAS' | 'VIATURAS' | 'LOCAIS' | 'ANOMALIAS' | 'EMPRESTIMOS' | 'UTILIZADORES' | 'SISTEMA';
+  acao: string;
+  detalhes: string;
+}
+
+const AUDIT_LOGS_STORAGE_KEY = 'eq991_audit_logs_v1';
+
+export function getStoredAuditLogs(): AuditLogItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(AUDIT_LOGS_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+
+    // Initial default logs if empty
+    const defaultLogs: AuditLogItem[] = [
+      {
+        id: 'aud-101',
+        timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
+        trigrama: 'OLV',
+        nome: 'Manuel Oliveira',
+        posto: 'TEN',
+        categoria: 'RESERVAS',
+        acao: 'Aprovação de Pedido',
+        detalhes: 'Pedido aprovado para Sintra com atribuição da viatura AM-96-11 (98.620 KM).'
+      },
+      {
+        id: 'aud-102',
+        timestamp: new Date(Date.now() - 3600000 * 5).toISOString(),
+        trigrama: 'SIL',
+        nome: 'João Silva',
+        posto: '1SAR',
+        categoria: 'VIATURAS',
+        acao: 'Registo de Abastecimento',
+        detalhes: 'Abastecimento de 50L registado na viatura AM-96-12 (BA2 - Ota).'
+      },
+      {
+        id: 'aud-103',
+        timestamp: new Date(Date.now() - 3600000 * 12).toISOString(),
+        trigrama: 'FER',
+        nome: 'Pedro Ferreira',
+        posto: 'CAP',
+        categoria: 'LOCAIS',
+        acao: 'Atualização de Parque/Chaveiro',
+        detalhes: 'Locais sincronizados: Telheiro 991 e Chaveiro 991.'
+      }
+    ];
+
+    localStorage.setItem(AUDIT_LOGS_STORAGE_KEY, JSON.stringify(defaultLogs));
+    return defaultLogs;
+  } catch (err) {
+    return [];
+  }
+}
+
+export function logAuditAction(
+  categoria: AuditLogItem['categoria'],
+  acao: string,
+  detalhes: string
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const prof = getStoredMilitaryProfile();
+    const newLog: AuditLogItem = {
+      id: `audit-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: new Date().toISOString(),
+      trigrama: prof.nip ? `NIP-${prof.nip}` : 'ADMIN',
+      nome: prof.nome || 'Gestor de Logística',
+      posto: prof.posto || 'TEN',
+      categoria,
+      acao,
+      detalhes
+    };
+
+    const current = getStoredAuditLogs();
+    const updated = [newLog, ...current].slice(0, 500);
+    localStorage.setItem(AUDIT_LOGS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Erro ao registar log de auditoria:', err);
+  }
+}
