@@ -19,7 +19,9 @@ import {
   Filter,
   User,
   MapPin,
-  Sparkles
+  Sparkles,
+  Truck,
+  Mail
 } from 'lucide-react';
 import { supabase, Viatura, Pedido } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_PEDIDOS } from '@/lib/mock-data';
@@ -70,7 +72,16 @@ export default function AdminDashboardPage() {
         }
 
         let fleet = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
-        fleet = fleet.map(sanitizeViaturaKm);
+        fleet = fleet.map((v) => {
+          const sanitized = sanitizeViaturaKm(v);
+          const hasApprovedBooking = combined.some(
+            (p) => p.viatura_id === v.id && p.estado_pedido === 'APROVADO'
+          );
+          if (hasApprovedBooking && sanitized.estado === 'DISPONIVEL') {
+            return { ...sanitized, estado: 'RESERVADA' };
+          }
+          return sanitized;
+        });
 
         setViaturas(fleet);
         setPedidos(combined);
@@ -658,6 +669,31 @@ export default function AdminDashboardPage() {
                 <span className="text-slate-300 block">Destino: {approvingPedido.destino}</span>
               </div>
 
+              {approvingPedido.necessita_reboque && (
+                <div className="p-3 rounded-xl bg-amber-950/90 border-2 border-amber-500/80 text-amber-200 text-xs space-y-2">
+                  <div className="flex items-center space-x-2 font-bold text-amber-300">
+                    <Truck className="w-4 h-4 text-amber-400" />
+                    <span>⚠️ REBOQUE SOLICITADO PARA ESTA RESERVA</span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/90">
+                    Este pedido necessita de reboque. Clique abaixo para enviar o email pré-criado para a manutenção:
+                  </p>
+                  <a
+                    href={`mailto:manutencao.reboques.eq991@emfa.pt?subject=${encodeURIComponent(
+                      `Esquadra 991 - ALERTA DE REBOQUE: Pedido Aprovado (${approvingPedido.destino})`
+                    )}&body=${encodeURIComponent(
+                      `À Equipa de Manutenção de Reboques,\n\nInformamos que o pedido de reserva do militar ${approvingPedido.posto} ${approvingPedido.nome_utilizador} [NIP ${approvingPedido.nip}] para o destino ${approvingPedido.destino} foi APROVADO com necessidade de GANCHO DE REBOQUE.\n\nViatura Atribuída: ${viaturas.find((v) => v.id === selectedViaturaIdForApproval)?.matricula || 'AM-96-11'}\nPeríodo: ${new Date(approvingPedido.data_inicio).toLocaleString()} até ${new Date(approvingPedido.data_fim).toLocaleString()}\n\nFavor preparar a viatura e o equipamento de reboque.\n\nCumprimentos,\nLogística Esquadra 991`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center space-x-2 shadow-md transition-colors"
+                  >
+                    <Truck className="w-4 h-4" />
+                    <span>🚛 Enviar Email à Manutenção de Reboques</span>
+                  </a>
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-400 mb-1 font-semibold">Selecionar Viatura a Atribuir ao Militar *</label>
                 <select
@@ -674,6 +710,22 @@ export default function AdminDashboardPage() {
                 <p className="text-[10px] text-amber-400 mt-1 font-mono">
                   * O estado da viatura passará para <strong>RESERVADA</strong> durante o período da reserva.
                 </p>
+              </div>
+
+              <div className="pt-2 space-y-2">
+                <a
+                  href={`mailto:${approvingPedido.email || 'militar@emfa.pt'}?subject=${encodeURIComponent(
+                    `Esquadra 991 - Pedido de Viatura APROVADO [${approvingPedido.destino}]`
+                  )}&body=${encodeURIComponent(
+                    `Exmo. Militar ${approvingPedido.posto} ${approvingPedido.nome_utilizador},\n\nInformamos que o seu pedido de reserva de viatura com destino a ${approvingPedido.destino} foi APROVADO.\n\nViatura Atribuída: ${viaturas.find((v) => v.id === selectedViaturaIdForApproval)?.matricula || 'AM-96-11'}\nPeríodo: ${new Date(approvingPedido.data_inicio).toLocaleString()} até ${new Date(approvingPedido.data_fim).toLocaleString()}\n\nÀ chegada ao chaveiro, utilize a opção de desbloqueio de viatura.\n\nCumprimentos,\nLogística Esquadra 991`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-md transition-colors"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>📧 Enviar Email de Notificação via Cliente de Email</span>
+                </a>
               </div>
 
               <div className="pt-2 flex items-center justify-end space-x-2">

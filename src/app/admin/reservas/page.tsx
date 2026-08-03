@@ -66,10 +66,6 @@ export default function AdminReservasPage() {
         const { data: vData } = await supabase.from('viaturas').select('*');
         const { data: pData } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
 
-        let fleet = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
-        fleet = fleet.map(sanitizeViaturaKm);
-        setViaturas(fleet);
-
         const localStored = getStoredPedidos();
         const dbPedidos: Pedido[] = pData || [];
 
@@ -81,6 +77,19 @@ export default function AdminReservasPage() {
           }
         }
 
+        let fleet = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
+        fleet = fleet.map((v) => {
+          const sanitized = sanitizeViaturaKm(v);
+          const hasApprovedBooking = combined.some(
+            (p) => p.viatura_id === v.id && p.estado_pedido === 'APROVADO'
+          );
+          if (hasApprovedBooking && sanitized.estado === 'DISPONIVEL') {
+            return { ...sanitized, estado: 'RESERVADA' };
+          }
+          return sanitized;
+        });
+
+        setViaturas(fleet);
         setPedidos(combined);
 
         if (fleet.length > 0) {

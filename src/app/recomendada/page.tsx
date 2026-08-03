@@ -37,9 +37,22 @@ export default function RecomendadaPage() {
 
         const { data: vData } = await supabase.from('viaturas').select('*');
         const { data: aData } = await supabase.from('anomalias').select('*');
+        const { data: pData } = await supabase.from('pedidos').select('*');
+
+        const dbPedidos = pData || [];
 
         let fleet: Viatura[] = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
-        fleet = fleet.map((v) => sanitizeViaturaKm(localOverrides[v.id] ? { ...v, ...localOverrides[v.id] } : v));
+        fleet = fleet.map((v) => {
+          const sanitized = sanitizeViaturaKm(localOverrides[v.id] ? { ...v, ...localOverrides[v.id] } : v);
+          const hasApprovedBooking = dbPedidos.some(
+            (p: any) => p.viatura_id === v.id && p.estado_pedido === 'APROVADO'
+          );
+          if (hasApprovedBooking && sanitized.estado === 'DISPONIVEL') {
+            return { ...sanitized, estado: 'RESERVADA' };
+          }
+          return sanitized;
+        });
+
         const anomalies: Anomalia[] = aData && aData.length > 0 ? aData : MOCK_ANOMALIAS;
 
         setViaturas(fleet);
