@@ -17,7 +17,7 @@ export default function RouteMap({ pontosGps }: RouteMapProps) {
   if (!mounted) {
     return (
       <div className="w-full h-96 rounded-xl bg-slate-900 flex items-center justify-center text-slate-500 text-sm font-mono">
-        A carregar mapa de percurso (Centro: 39.094, -8.967)...
+        A carregar mapa de percurso (Centro: 39.092, -8.968)...
       </div>
     );
   }
@@ -25,7 +25,7 @@ export default function RouteMap({ pontosGps }: RouteMapProps) {
   if (!pontosGps || pontosGps.length === 0) {
     return (
       <div className="w-full h-96 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 text-sm font-mono">
-        Sem dados de coordenadas GPS para o filtro selecionado (Centro: 39.094, -8.967).
+        Sem dados de coordenadas GPS para o filtro selecionado (Centro: 39.092, -8.968).
       </div>
     );
   }
@@ -34,8 +34,8 @@ export default function RouteMap({ pontosGps }: RouteMapProps) {
   const L = require('leaflet');
 
   const positions: [number, number][] = pontosGps.map((p) => [p.latitude, p.longitude]);
-  // Default requested center: [39.094, -8.967]
-  const centerPos = positions[0] || [39.094, -8.967];
+  // Default requested center: [39.092, -8.968]
+  const centerPos = positions[0] || [39.092, -8.968];
 
   const getEventIcon = (tipo: string) => {
     let color = '#22c55e'; // Green for start

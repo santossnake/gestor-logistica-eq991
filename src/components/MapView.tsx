@@ -39,25 +39,25 @@ export default function MapView({ viaturas, selectedViaturaId, onSelectViatura }
 
   // Custom square marker icon creator reflecting real-time operational status
   const createCustomSquareIcon = (estado: string, matricula: string, necessitaLimpeza?: boolean) => {
-    let bgColor = '#22c55e'; // Emerald green for DISPONIVEL & clean
-    let badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#10b981; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">✓</span>';
+    let bgColor = '#10b981'; // Emerald green for DISPONIVEL & clean
+    let badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#059669; color:#ffffff; width:15px; height:15px; border-radius:50%; border:1.5px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">✓</span>';
 
-    if (necessitaLimpeza) {
+    if (necessitaLimpeza === true) {
       bgColor = '#f59e0b'; // Amber for cleaning needed
-      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#d97706; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px;">🧼</span>';
+      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#d97706; color:#ffffff; width:15px; height:15px; border-radius:50%; border:1.5px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:10px;">🧼</span>';
     } else if (estado === 'RESERVADA') {
       bgColor = '#d97706'; // Amber/Orange for RESERVADA
-      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#b45309; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px;">📅</span>';
+      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#b45309; color:#ffffff; width:15px; height:15px; border-radius:50%; border:1.5px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:10px;">📅</span>';
     } else if (estado === 'EM_USO') {
       bgColor = '#3b82f6'; // Blue for EM_USO
-      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#1d4ed8; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px;">🚗</span>';
+      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#1d4ed8; color:#ffffff; width:15px; height:15px; border-radius:50%; border:1.5px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:10px;">🚗</span>';
     } else if (estado === 'MANUTENCAO' || estado === 'EMPRESTADA_EXTERNO') {
       bgColor = '#ef4444'; // Red for indisponível / anomalia
-      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#b91c1c; width:14px; height:14px; border-radius:50%; border:1px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:9px;">⚠️</span>';
+      badgeHtml = '<span style="position:absolute; top:-6px; right:-6px; background:#b91c1c; color:#ffffff; width:15px; height:15px; border-radius:50%; border:1.5px solid #ffffff; display:flex; align-items:center; justify-content:center; font-size:10px;">⚠️</span>';
     }
 
     const digits = getLastTwoDigits(matricula);
-    const borderStyle = necessitaLimpeza ? '3px dashed #fbbf24' : '2px solid #ffffff';
+    const borderStyle = necessitaLimpeza === true ? '3px dashed #fbbf24' : '2.5px solid #ffffff';
 
     return L.divIcon({
       className: 'custom-square-pin',

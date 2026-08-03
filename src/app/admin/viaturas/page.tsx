@@ -75,16 +75,14 @@ export default function AdminViaturasPage() {
 
   const [dbLocais, setDbLocais] = useState<any[]>([]);
 
-  // Compute available locations dynamically from dbLocais and current fleet
+  // Compute available locations dynamically from dbLocais and current fleet strictly
   const vtrLocsFromSystem = dbLocais.filter((l: any) => l.tipo === 'VIATURA').map((l: any) => l.nome);
   const vtrLocsFromFleet = viaturas.map((v) => v.localizacao_atual_viatura).filter(Boolean);
-  const rawVtrList = Array.from(new Set([...vtrLocsFromSystem, ...vtrLocsFromFleet]));
-  const allVtrLocations = rawVtrList.length > 0 ? rawVtrList : ['Telheiro 991'];
+  const allVtrLocations = Array.from(new Set([...vtrLocsFromSystem, ...vtrLocsFromFleet]));
 
   const keyLocsFromSystem = dbLocais.filter((l: any) => l.tipo === 'CHAVE').map((l: any) => l.nome);
   const keyLocsFromFleet = viaturas.map((v) => v.localizacao_atual_chave).filter(Boolean);
-  const rawKeyList = Array.from(new Set([...keyLocsFromSystem, ...keyLocsFromFleet]));
-  const allKeyLocations = rawKeyList.length > 0 ? rawKeyList : ['Chaveiro 991'];
+  const allKeyLocations = Array.from(new Set([...keyLocsFromSystem, ...keyLocsFromFleet]));
 
   const handleSelectLocalViaturaOption = (val: string) => {
     setSelectedLocalViaturaOption(val);
@@ -142,13 +140,7 @@ export default function AdminViaturasPage() {
     async function loadData() {
       try {
         const { data: lData } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
-        const storedLocs = getStoredLocais();
-        const combinedLocs = lData && lData.length > 0 ? lData : storedLocs;
-
-        setDbLocais(combinedLocs.filter((l: any) => l.is_ativo !== false));
-        if (lData && lData.length > 0) {
-          saveStoredLocais(lData);
-        }
+        setDbLocais(lData ? lData.filter((l: any) => l.is_ativo !== false) : []);
 
         const overrides = getFleetOverrides();
 

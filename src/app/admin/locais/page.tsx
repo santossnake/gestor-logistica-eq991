@@ -27,15 +27,12 @@ export default function LocaisAdminPage() {
         const { data, error } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
         if (!error && data) {
           setLocais(data);
-          saveStoredLocais(data);
         } else {
-          const stored = getStoredLocais();
-          setLocais(stored);
+          setLocais([]);
         }
       } catch (err) {
         console.error(err);
-        const stored = getStoredLocais();
-        setLocais(stored);
+        setLocais([]);
       } finally {
         setLoading(false);
       }
