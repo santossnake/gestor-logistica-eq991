@@ -26,8 +26,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { supabase, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
-import { MOCK_VIATURAS, MOCK_GPS } from '@/lib/mock-data';
-import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride } from '@/lib/utils/cookies';
+import { MOCK_VIATURAS, MOCK_GPS, MOCK_LOCAIS } from '@/lib/mock-data';
+import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride, getStoredLocais } from '@/lib/utils/cookies';
 
 const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false });
 
@@ -62,10 +62,57 @@ export default function AdminViaturasPage() {
   const [numLugares, setNumLugares] = useState<number>(5);
   const [temGancho, setTemGancho] = useState<boolean>(true);
   const [kmAtuais, setKmAtuais] = useState<number>(98620);
-  const [localViatura, setLocalViatura] = useState<string>('Parque Principal EQ991 (Ota)');
-  const [localChave, setLocalChave] = useState<string>('Chaveiro Principal - Armário A');
+  const [localViatura, setLocalViatura] = useState<string>('Telheiro 991');
+  const [localChave, setLocalChave] = useState<string>('Chaveiro 991');
+  const [selectedLocalViaturaOption, setSelectedLocalViaturaOption] = useState<string>('Telheiro 991');
+  const [isCustomLocalViatura, setIsCustomLocalViatura] = useState<boolean>(false);
+
+  const [selectedLocalChaveOption, setSelectedLocalChaveOption] = useState<string>('Chaveiro 991');
+  const [isCustomLocalChave, setIsCustomLocalChave] = useState<boolean>(false);
+
   const [kmProximaRevisao, setKmProximaRevisao] = useState<number>(110000);
   const [dataProximaRevisao, setDataProximaRevisao] = useState<string>('2026-11-15');
+
+  // Compute available locations dynamically
+  const storedLocais = typeof window !== 'undefined' ? getStoredLocais() : [];
+  const systemLocais = storedLocais.length > 0 ? storedLocais : MOCK_LOCAIS;
+
+  const defaultVtrLocs = [
+    'Telheiro 991',
+    'Estacionamento Alternativo ao Telheiro 991',
+    'Hangar 6',
+    'Oficial de Dia',
+    'Hotel Mirandela',
+    'Alojamento BA11'
+  ];
+  const vtrLocsFromSystem = systemLocais.filter((l: any) => l.tipo === 'VIATURA' && l.is_ativo !== false).map((l: any) => l.nome);
+  const allVtrLocations = Array.from(new Set([...defaultVtrLocs, ...vtrLocsFromSystem]));
+
+  const defaultKeyLocs = ['Chaveiro 991', 'Logística', 'Oficial de Dia'];
+  const keyLocsFromSystem = systemLocais.filter((l: any) => l.tipo === 'CHAVE' && l.is_ativo !== false).map((l: any) => l.nome);
+  const allKeyLocations = Array.from(new Set([...defaultKeyLocs, ...keyLocsFromSystem]));
+
+  const handleSelectLocalViaturaOption = (val: string) => {
+    setSelectedLocalViaturaOption(val);
+    if (val === 'OUTRO') {
+      setIsCustomLocalViatura(true);
+      setLocalViatura('');
+    } else {
+      setIsCustomLocalViatura(false);
+      setLocalViatura(val);
+    }
+  };
+
+  const handleSelectLocalChaveOption = (val: string) => {
+    setSelectedLocalChaveOption(val);
+    if (val === 'OUTRO') {
+      setIsCustomLocalChave(true);
+      setLocalChave('');
+    } else {
+      setIsCustomLocalChave(false);
+      setLocalChave(val);
+    }
+  };
 
   // Refueling Modal for Logistics
   const [showRefuelModal, setShowRefuelModal] = useState<boolean>(false);
@@ -295,8 +342,17 @@ export default function AdminViaturasPage() {
     setNumLugares(5);
     setTemGancho(true);
     setKmAtuais(98620);
-    setLocalViatura('Parque Principal EQ991 (Ota)');
-    setLocalChave('Chaveiro 991');
+
+    const firstVtr = allVtrLocations[0] || 'Telheiro 991';
+    setSelectedLocalViaturaOption(firstVtr);
+    setLocalViatura(firstVtr);
+    setIsCustomLocalViatura(false);
+
+    const firstKey = allKeyLocations[0] || 'Chaveiro 991';
+    setSelectedLocalChaveOption(firstKey);
+    setLocalChave(firstKey);
+    setIsCustomLocalChave(false);
+
     setKmProximaRevisao(100000);
     setDataProximaRevisao('2027-08-02');
     setIsModalOpen(true);
@@ -309,8 +365,25 @@ export default function AdminViaturasPage() {
     setNumLugares(v.num_lugares);
     setTemGancho(v.tem_gancho_reboque);
     setKmAtuais(v.km_atuais);
+
+    if (allVtrLocations.includes(v.localizacao_atual_viatura)) {
+      setSelectedLocalViaturaOption(v.localizacao_atual_viatura);
+      setIsCustomLocalViatura(false);
+    } else {
+      setSelectedLocalViaturaOption('OUTRO');
+      setIsCustomLocalViatura(true);
+    }
     setLocalViatura(v.localizacao_atual_viatura);
+
+    if (allKeyLocations.includes(v.localizacao_atual_chave)) {
+      setSelectedLocalChaveOption(v.localizacao_atual_chave);
+      setIsCustomLocalChave(false);
+    } else {
+      setSelectedLocalChaveOption('OUTRO');
+      setIsCustomLocalChave(true);
+    }
     setLocalChave(v.localizacao_atual_chave);
+
     setKmProximaRevisao(v.km_proxima_revisao || Math.ceil((v.km_atuais + 1) / 10000) * 10000);
     setDataProximaRevisao(v.data_proxima_revisao || '2027-08-02');
     setIsModalOpen(true);
@@ -923,24 +996,60 @@ export default function AdminViaturasPage() {
                 </label>
               </div>
 
-              <div>
-                <label className="block text-slate-400 mb-1">Localização da Viatura</label>
-                <input
-                  type="text"
-                  value={localViatura}
-                  onChange={(e) => setLocalViatura(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs"
-                />
+              {/* Localização da Viatura - Combo Box & Custom manual input */}
+              <div className="space-y-1.5">
+                <label className="block text-slate-400 font-semibold">Local de Estacionamento da Viatura</label>
+                <select
+                  value={selectedLocalViaturaOption}
+                  onChange={(e) => handleSelectLocalViaturaOption(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono font-bold"
+                >
+                  {allVtrLocations.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                  <option value="OUTRO">Outro... (Escrever manualmente)</option>
+                </select>
+
+                {(isCustomLocalViatura || selectedLocalViaturaOption === 'OUTRO') && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Escreva o local de estacionamento personalizado..."
+                    value={localViatura}
+                    onChange={(e) => setLocalViatura(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-emerald-500/60 text-slate-100 text-xs font-mono mt-1"
+                  />
+                )}
               </div>
 
-              <div>
-                <label className="block text-slate-400 mb-1">Localização do Chaveiro</label>
-                <input
-                  type="text"
-                  value={localChave}
-                  onChange={(e) => setLocalChave(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs"
-                />
+              {/* Localização do Chaveiro - Combo Box & Custom manual input */}
+              <div className="space-y-1.5">
+                <label className="block text-slate-400 font-semibold">Local do Chaveiro / Armário de Chaves</label>
+                <select
+                  value={selectedLocalChaveOption}
+                  onChange={(e) => handleSelectLocalChaveOption(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono font-bold"
+                >
+                  {allKeyLocations.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                  <option value="OUTRO">Outro... (Escrever manualmente)</option>
+                </select>
+
+                {(isCustomLocalChave || selectedLocalChaveOption === 'OUTRO') && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Escreva a localização do chaveiro personalizada..."
+                    value={localChave}
+                    onChange={(e) => setLocalChave(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-emerald-500/60 text-slate-100 text-xs font-mono mt-1"
+                  />
+                )}
               </div>
 
               <div className="pt-2 flex items-center justify-end space-x-2">
