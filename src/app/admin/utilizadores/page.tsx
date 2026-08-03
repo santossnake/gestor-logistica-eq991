@@ -350,10 +350,6 @@ export default function GestaoUtilizadoresPage() {
               <div>
                 <h4 className="text-sm font-bold text-slate-100">{u.posto} {u.nome}</h4>
                 <p className="text-xs font-mono text-slate-400">{u.email}</p>
-                <div className="mt-1 pt-1 border-t border-slate-800 text-[11px] font-mono text-amber-300 flex items-center space-x-1">
-                  <KeyRound className="w-3 h-3 text-amber-400" />
-                  <span>Password: {u.password || '123456'}</span>
-                </div>
               </div>
 
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">

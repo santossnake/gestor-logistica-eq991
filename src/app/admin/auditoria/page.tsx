@@ -54,6 +54,15 @@ export default function AuditoriaPage() {
     document.body.removeChild(link);
   };
 
+  const handleClearLogs = () => {
+    if (confirm('Tem a certeza que deseja limpar todo o histórico de auditoria do sistema?')) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('eq991_audit_logs_v1');
+      }
+      setLogs([]);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -72,13 +81,22 @@ export default function AuditoriaPage() {
           </div>
         </div>
 
-        <button
-          onClick={handleExportCSV}
-          className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-emerald-950 transition-colors"
-        >
-          <Download className="w-4 h-4" />
-          <span>Exportar Relatório Audit CSV</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleClearLogs}
+            className="px-3 py-2 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center space-x-1.5 transition-colors"
+          >
+            <span>Limpar Histórico</span>
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-emerald-950 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span>Exportar CSV</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Toolbar */}
