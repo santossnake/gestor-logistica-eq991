@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Shield, Lock, KeyRound, ArrowRight, UserCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { MOCK_UTILIZADORES_LOGISTICA } from '@/lib/mock-data';
-import { getStoredUtilizadores, logAuditAction } from '@/lib/utils/cookies';
+import { logAuditAction } from '@/lib/utils/cookies';
 
 export default function LoginPage() {
   const [trigramaOuEmail, setTrigramaOuEmail] = useState<string>('OLV');
@@ -26,14 +26,12 @@ export default function LoginPage() {
     const inputPass = password.trim();
 
     try {
-      const storedUsers = getStoredUtilizadores();
-      const allUsers = storedUsers.length > 0 ? storedUsers : MOCK_UTILIZADORES_LOGISTICA;
-
-      const user = allUsers.find(
-        (u: any) => u.trigrama.toUpperCase() === loginInput || u.email.toUpperCase() === loginInput
+      const { data: dbUsers } = await supabase.from('utilizadores_logistica').select('*');
+      const user = dbUsers?.find(
+        (u: any) => u.trigrama?.toUpperCase() === loginInput || u.email?.toUpperCase() === loginInput
       );
 
-      const validPassword = user ? (user.password || '123456') : '123456';
+      const validPassword = user?.password || '123456';
 
       if (inputPass === validPassword || inputPass === '123456' || inputPass === 'eq991') {
         localStorage.setItem('eq991_admin_auth', 'true');
