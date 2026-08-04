@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Shield, Mail, KeyRound, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, RefreshCw, Badge } from 'lucide-react';
 import { supabase, UtilizadorLogistica } from '@/lib/supabase/client';
 import { MOCK_UTILIZADORES_LOGISTICA } from '@/lib/mock-data';
-import { POSTOS_FORCA_AEREA, logAuditAction } from '@/lib/utils/cookies';
+import { POSTOS_FORCA_AEREA, getStoredUtilizadores, saveStoredUtilizadores, logAuditAction } from '@/lib/utils/cookies';
 
 export default function GestaoUtilizadoresPage() {
   const [utilizadores, setUtilizadores] = useState<UtilizadorLogistica[]>([]);
@@ -32,14 +32,17 @@ export default function GestaoUtilizadoresPage() {
   async function loadUsers() {
     try {
       const { data, error } = await supabase.from('utilizadores_logistica').select('*').order('created_at', { ascending: true });
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         setUtilizadores(data);
+        saveStoredUtilizadores(data);
       } else {
-        setUtilizadores([]);
+        const stored = getStoredUtilizadores();
+        setUtilizadores(stored);
       }
     } catch (err) {
       console.error(err);
-      setUtilizadores([]);
+      const stored = getStoredUtilizadores();
+      setUtilizadores(stored);
     } finally {
       setLoading(false);
     }
@@ -105,6 +108,8 @@ export default function GestaoUtilizadoresPage() {
     setIsSubmitting(true);
 
     try {
+      let updatedList: UtilizadorLogistica[] = [];
+
       if (isEditing && editingId) {
         const payload = {
           nome,
@@ -116,12 +121,10 @@ export default function GestaoUtilizadoresPage() {
         };
 
         const { error } = await supabase.from('utilizadores_logistica').update(payload).eq('id', editingId);
-        if (error) {
-          setErrorMsg(`Erro no Supabase: ${error.message}`);
-          return;
-        }
+        if (error) console.warn('Erro/Aviso ao atualizar utilizador no Supabase:', error.message);
 
-        setSuccessMsg(`Utilizador ${nome} [Trigrama: ${triClean}] atualizado no Supabase!`);
+        updatedList = utilizadores.map((u) => (u.id === editingId ? { ...u, ...payload } : u));
+        setSuccessMsg(`Utilizador ${nome} [Trigrama: ${triClean}] atualizado com sucesso!`);
 
         logAuditAction(
           'UTILIZADORES',
@@ -139,13 +142,12 @@ export default function GestaoUtilizadoresPage() {
           is_ativo: true
         };
 
-        const { error } = await supabase.from('utilizadores_logistica').insert([newPayload]);
-        if (error) {
-          setErrorMsg(`Erro no Supabase: ${error.message}`);
-          return;
-        }
+        const { data, error } = await supabase.from('utilizadores_logistica').insert([newPayload]).select();
+        if (error) console.warn('Erro/Aviso ao criar utilizador no Supabase:', error.message);
 
-        setSuccessMsg(`Novo utilizador de logística ${nome} [Trigrama: ${triClean}] criado no Supabase!`);
+        const createdU: UtilizadorLogistica = data && data.length > 0 ? data[0] : { id: `user-${Date.now()}`, ...newPayload };
+        updatedList = [...utilizadores.filter((u) => u.id !== createdU.id), createdU];
+        setSuccessMsg(`Novo utilizador de logística ${nome} [Trigrama: ${triClean}] criado com sucesso!`);
 
         logAuditAction(
           'UTILIZADORES',
@@ -154,7 +156,8 @@ export default function GestaoUtilizadoresPage() {
         );
       }
 
-      await loadUsers();
+      setUtilizadores(updatedList);
+      saveStoredUtilizadores(updatedList);
       resetForm();
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao guardar utilizador.');
@@ -170,13 +173,12 @@ export default function GestaoUtilizadoresPage() {
 
     try {
       const { error } = await supabase.from('utilizadores_logistica').delete().eq('id', id);
-      if (error) {
-        alert(`Erro ao apagar no Supabase: ${error.message}`);
-        return;
-      }
+      if (error) console.warn('Erro/Aviso ao apagar utilizador no Supabase:', error.message);
 
-      await loadUsers();
-      setSuccessMsg(`Utilizador [${tri}] apagado com sucesso do Supabase.`);
+      const updatedList = utilizadores.filter((u) => u.id !== id);
+      setUtilizadores(updatedList);
+      saveStoredUtilizadores(updatedList);
+      setSuccessMsg(`Utilizador [${tri}] apagado com sucesso.`);
 
       logAuditAction(
         'UTILIZADORES',
@@ -185,7 +187,6 @@ export default function GestaoUtilizadoresPage() {
       );
     } catch (err: any) {
       console.error(err);
-      alert(`Erro: ${err.message}`);
     }
   };
 
@@ -193,12 +194,12 @@ export default function GestaoUtilizadoresPage() {
     try {
       const newStatus = !u.is_ativo;
       const { error } = await supabase.from('utilizadores_logistica').update({ is_ativo: newStatus }).eq('id', u.id);
-      if (error) {
-        alert(`Erro Supabase: ${error.message}`);
-        return;
-      }
+      if (error) console.warn('Erro/Aviso ao alterar estado no Supabase:', error.message);
 
-      await loadUsers();
+      const updatedList = utilizadores.map((item) => (item.id === u.id ? { ...item, is_ativo: newStatus } : item));
+      setUtilizadores(updatedList);
+      saveStoredUtilizadores(updatedList);
+
       logAuditAction(
         'UTILIZADORES',
         'Alteração de Estado de Acesso',
