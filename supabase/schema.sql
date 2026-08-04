@@ -267,14 +267,30 @@ ALTER TABLE public.emprestimos_externos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fotos_emprestimo ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.anomalias ENABLE ROW LEVEL SECURITY;
 
--- Permitir leitura/escrita anonima controlada para operação militar sem login
-CREATE POLICY "Permitir Acesso Leitura Geral" ON public.locais FOR SELECT USING (true);
-CREATE POLICY "Permitir Acesso Leitura Viaturas" ON public.viaturas FOR SELECT USING (true);
-CREATE POLICY "Permitir Atualizacao Viaturas" ON public.viaturas FOR UPDATE USING (true);
-CREATE POLICY "Permitir Escrita Pedidos" ON public.pedidos FOR ALL USING (true);
-CREATE POLICY "Permitir Escrita Registos Marcha" ON public.registos_marcha FOR ALL USING (true);
-CREATE POLICY "Permitir Escrita Historico GPS" ON public.historico_posicoes_gps FOR ALL USING (true);
-CREATE POLICY "Permitir Escrita Anomalias" ON public.anomalias FOR ALL USING (true);
-CREATE POLICY "Permitir Acesso Emprestimos" ON public.emprestimos_externos FOR ALL USING (true);
-CREATE POLICY "Permitir Acesso Fotos Emprestimo" ON public.fotos_emprestimo FOR ALL USING (true);
-CREATE POLICY "Permitir Acesso Notificacoes" ON public.notificacoes_utilizadores FOR ALL USING (true);
+-- Permitir acesso total (SELECT, INSERT, UPDATE, DELETE) para operação militar
+DROP POLICY IF EXISTS "Permitir Acesso Total Locais" ON public.locais;
+CREATE POLICY "Permitir Acesso Total Locais" ON public.locais FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir Acesso Total Viaturas" ON public.viaturas;
+CREATE POLICY "Permitir Acesso Total Viaturas" ON public.viaturas FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir Escrita Pedidos" ON public.pedidos;
+CREATE POLICY "Permitir Escrita Pedidos" ON public.pedidos FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir Escrita Registos Marcha" ON public.registos_marcha;
+CREATE POLICY "Permitir Escrita Registos Marcha" ON public.registos_marcha FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir Escrita Historico GPS" ON public.historico_posicoes_gps;
+CREATE POLICY "Permitir Escrita Historico GPS" ON public.historico_posicoes_gps FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir Escrita Anomalias" ON public.anomalias;
+CREATE POLICY "Permitir Escrita Anomalias" ON public.anomalias FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir Acesso Emprestimos" ON public.emprestimos_externos;
+CREATE POLICY "Permitir Acesso Emprestimos" ON public.emprestimos_externos FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir Acesso Fotos Emprestimo" ON public.fotos_emprestimo;
+CREATE POLICY "Permitir Acesso Fotos Emprestimo" ON public.fotos_emprestimo FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir Acesso Notificacoes" ON public.notificacoes_utilizadores;
+CREATE POLICY "Permitir Acesso Notificacoes" ON public.notificacoes_utilizadores FOR ALL USING (true) WITH CHECK (true);

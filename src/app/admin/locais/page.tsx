@@ -86,6 +86,9 @@ export default function LocaisAdminPage() {
         const { error } = await supabase.from('locais').update(payload).eq('id', editingId);
         if (error) {
           console.warn('Erro/Aviso ao atualizar no Supabase:', error.message);
+          setErrorMsg(`Nota de Sincronização Supabase: ${error.message}`);
+        } else {
+          setSuccessMsg(`Local "${nomeInput}" atualizado no Supabase com sucesso!`);
         }
 
         // 2. Update local state and mirror
@@ -99,7 +102,6 @@ export default function LocaisAdminPage() {
           return l;
         });
 
-        setSuccessMsg(`Local "${nomeInput}" atualizado com sucesso!`);
         logAuditAction('LOCAIS', 'Edição de Local', `Atualizado o local [${tipoInput}] "${nomeInput}".`);
       } else {
         // CREATE new location
@@ -113,6 +115,9 @@ export default function LocaisAdminPage() {
         const { data, error } = await supabase.from('locais').insert([payload]).select();
         if (error) {
           console.warn('Erro/Aviso ao criar no Supabase:', error.message);
+          setErrorMsg(`Nota de Sincronização Supabase: ${error.message}`);
+        } else {
+          setSuccessMsg(`Novo local "${nomeInput}" adicionado no Supabase com sucesso!`);
         }
 
         const created = data && data.length > 0 ? data[0] : { id: `loc-${Date.now()}`, ...payload };
@@ -122,7 +127,6 @@ export default function LocaisAdminPage() {
           created
         ];
 
-        setSuccessMsg(`Novo local "${nomeInput}" adicionado com sucesso!`);
         logAuditAction('LOCAIS', 'Criação de Local', `Adicionado o local [${tipoInput}] "${nomeInput}".`);
       }
 
@@ -130,13 +134,13 @@ export default function LocaisAdminPage() {
       saveStoredLocais(updatedList);
 
       // Re-sync with Supabase
-      const { data: refreshed } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
-      if (refreshed && refreshed.length > 0) {
+      const { data: refreshed, error: refErr } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
+      if (!refErr && refreshed && refreshed.length > 0) {
         setLocais(refreshed);
         saveStoredLocais(refreshed);
       }
 
-      setIsModalOpen(false);
+      if (!errorMsg) setIsModalOpen(false);
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || 'Erro ao guardar local.');
@@ -151,6 +155,7 @@ export default function LocaisAdminPage() {
       const { error } = await supabase.from('locais').delete().eq('id', id);
       if (error) {
         console.warn('Erro/Aviso ao apagar no Supabase:', error.message);
+        alert(`Aviso de Sincronização Supabase RLS: ${error.message}`);
       }
 
       // 2. Update local state and mirror immediately
