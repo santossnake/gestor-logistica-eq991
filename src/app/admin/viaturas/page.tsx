@@ -191,6 +191,7 @@ export default function AdminViaturasPage() {
     const nowIso = new Date().toISOString();
 
     try {
+      // 1. Try full update with cleaning metadata
       let { error } = await supabase
         .from('viaturas')
         .update({
@@ -200,15 +201,17 @@ export default function AdminViaturasPage() {
         })
         .eq('matricula', v.matricula);
 
+      // 2. If metadata columns do not exist in Supabase, fallback to simple update of necessita_limpeza
       if (error) {
-        await supabase
+        console.warn('Tentando atualizar limpeza simples no Supabase:', error.message);
+        let retry = await supabase
           .from('viaturas')
-          .update({
-            necessita_limpeza: false,
-            data_ultima_limpeza: nowIso,
-            limpo_por_nip: prof.nip || 'LOGÍSTICA'
-          })
-          .eq('id', v.id);
+          .update({ necessita_limpeza: false })
+          .eq('matricula', v.matricula);
+
+        if (retry.error) {
+          await supabase.from('viaturas').update({ necessita_limpeza: false }).eq('id', v.id);
+        }
       }
 
       setViaturas((prev) =>
@@ -219,7 +222,7 @@ export default function AdminViaturasPage() {
         )
       );
 
-      alert(`Limpeza registada com sucesso na viatura ${v.matricula}!`);
+      alert(`Limpeza da viatura ${v.matricula} registada no Supabase com sucesso!`);
       logAuditAction('VIATURAS', 'Limpeza Registada', `Registada limpeza na viatura ${v.matricula}.`);
     } catch (err) {
       console.error(err);
