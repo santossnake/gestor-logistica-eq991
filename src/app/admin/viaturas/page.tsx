@@ -140,7 +140,9 @@ export default function AdminViaturasPage() {
     async function loadData() {
       try {
         const { data: lData } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
-        setDbLocais(lData ? lData.filter((l: any) => l.is_ativo !== false) : []);
+        const storedLocs = getStoredLocais();
+        const rawLocs = (lData && lData.length > 0) ? lData : storedLocs;
+        setDbLocais(rawLocs.filter((l: any) => l.is_ativo !== false));
 
         const overrides = getFleetOverrides();
 
