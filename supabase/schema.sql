@@ -205,9 +205,10 @@ INSERT INTO public.viaturas (matricula, modelo, num_lugares, tem_gancho_reboque,
 -- Purge all existing vehicle booking requests
 DELETE FROM public.pedidos;
 
--- Add cleaning columns to viaturas if not exists
+-- Add cleaning and maintenance columns to viaturas if not exists
 ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS data_ultima_limpeza TIMESTAMP WITH TIME ZONE;
 ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS limpo_por_nip TEXT;
+ALTER TABLE public.viaturas ADD COLUMN IF NOT EXISTS data_proxima_revisao DATE DEFAULT '2027-08-02';
 
 -- -------------------------------------------------------
 -- 11. TABELA: registos_abastecimento (Abastecimentos Unidade / Bombas Comerciais)

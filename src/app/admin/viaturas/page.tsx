@@ -423,11 +423,20 @@ export default function AdminViaturasPage() {
 
     try {
       if (editingViatura) {
-        // First try updating by matricula (unique text field), then by id!
+        // 1. Try full payload matching by matricula
         let { error } = await supabase.from('viaturas').update(vData).eq('matricula', editingViatura.matricula);
-        if (error) {
-          const retry = await supabase.from('viaturas').update(vData).eq('id', editingViatura.id);
+
+        // 2. If data_proxima_revisao column is missing in Supabase, retry without date field
+        if (error && error.message.includes('data_proxima_revisao')) {
+          const { data_proxima_revisao, ...vDataClean } = vData;
+          const retry = await supabase.from('viaturas').update(vDataClean).eq('matricula', editingViatura.matricula);
           error = retry.error;
+        }
+
+        // 3. Retry matching by ID if matricula didn't match
+        if (error) {
+          const retryId = await supabase.from('viaturas').update(vData).eq('id', editingViatura.id);
+          error = retryId.error;
         }
 
         if (error) {
@@ -444,7 +453,13 @@ export default function AdminViaturasPage() {
           ...vData
         };
 
-        const { error } = await supabase.from('viaturas').insert([newRecord]);
+        let { error } = await supabase.from('viaturas').insert([newRecord]);
+        if (error && error.message.includes('data_proxima_revisao')) {
+          const { data_proxima_revisao, ...recClean } = newRecord;
+          const retry = await supabase.from('viaturas').insert([recClean]);
+          error = retry.error;
+        }
+
         if (error) {
           console.warn('Erro ao criar viatura no Supabase:', error.message);
           alert(`Aviso Supabase ao criar viatura: ${error.message}`);
