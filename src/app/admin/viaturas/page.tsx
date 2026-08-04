@@ -119,18 +119,14 @@ export default function AdminViaturasPage() {
   const [abastGpsLng, setAbastGpsLng] = useState<number | null>(null);
 
   // Helper to ensure real odometers and next maintenance target (multiple of 10,000 KM & 1 year from today)
+  // Helper to ensure valid revision target without mutating actual KM
   const sanitizeViaturaKm = (v: Viatura): Viatura => {
-    let km = v.km_atuais;
-    if (v.matricula === 'AM-96-11' && km < 98620) km = 98620;
-    if (v.matricula === 'AM-96-12' && km < 105888) km = 105888;
-    if (v.matricula === 'AM-96-13' && km < 102614) km = 102614;
-
+    const km = v.km_atuais;
     const nextKmTarget = Math.ceil((km + 1) / 10000) * 10000;
     const nextDateTarget = '2027-08-02';
 
     return {
       ...v,
-      km_atuais: km,
       km_proxima_revisao: v.km_proxima_revisao && v.km_proxima_revisao >= km ? v.km_proxima_revisao : nextKmTarget,
       data_proxima_revisao: v.data_proxima_revisao || nextDateTarget
     };
@@ -144,18 +140,11 @@ export default function AdminViaturasPage() {
         const rawLocs = (lData && lData.length > 0) ? lData : storedLocs;
         setDbLocais(rawLocs.filter((l: any) => l.is_ativo !== false));
 
-        const overrides = getFleetOverrides();
-
         const { data: vData } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
-        let fleet: Viatura[] = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
-
-        // Apply local overrides and sanitize odometers
-        fleet = fleet.map((v) => {
-          const merged = overrides[v.id] ? { ...v, ...overrides[v.id] } : v;
-          return sanitizeViaturaKm(merged);
-        });
-
-        setViaturas(fleet);
+        if (vData && vData.length > 0) {
+          const sanitized = vData.map((v) => sanitizeViaturaKm(v));
+          setViaturas(sanitized);
+        }
 
         const { data: gData } = await supabase.from('historico_posicoes_gps').select('*').order('registado_at', { ascending: false });
         if (gData && gData.length > 0) setTodosPontosGps(gData);
@@ -415,22 +404,33 @@ export default function AdminViaturasPage() {
       longitude_atual: -8.9680
     };
 
-    saveFleetOverride(editingViatura ? editingViatura.id : newToken, vData);
-
     try {
       if (editingViatura) {
-        await supabase.from('viaturas').update(vData).eq('id', editingViatura.id);
-        setViaturas((prev) => prev.map((v) => (v.id === editingViatura.id ? { ...v, ...vData } : v)));
+        let { error } = await supabase.from('viaturas').update(vData).eq('id', editingViatura.id);
+        if (error) {
+          console.warn('Tentando atualizar viatura no Supabase por matrícula:', error.message);
+          const retry = await supabase.from('viaturas').update(vData).eq('matricula', matricula);
+          error = retry.error;
+        }
+
+        if (error) {
+          console.warn('Erro ao atualizar viatura no Supabase:', error.message);
+        }
+
+        setViaturas((prev) => prev.map((v) => (v.id === editingViatura.id || v.matricula === matricula ? { ...v, ...vData } : v)));
       } else {
         const newRecord = {
-          id: `vtr-${Date.now()}`,
           qr_code_token: newToken,
           estado: 'DISPONIVEL',
           is_forcada_recomendada: false,
           ...vData
         };
-        await supabase.from('viaturas').insert([newRecord]);
-        setViaturas((prev) => [...prev, newRecord as any]);
+        const { data, error } = await supabase.from('viaturas').insert([newRecord]).select();
+        if (error) {
+          console.warn('Erro ao criar viatura no Supabase:', error.message);
+        }
+        const createdVtr = data && data.length > 0 ? data[0] : { id: `vtr-${Date.now()}`, ...newRecord };
+        setViaturas((prev) => [...prev, createdVtr as any]);
       }
 
       logAuditAction(

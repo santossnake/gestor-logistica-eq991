@@ -126,28 +126,8 @@ export function resetFleetOverridesToReal() {
 }
 
 export function getFleetOverrides(): Record<string, any> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem(FLEET_OVERRIDES_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-
-    // Auto-clean any stale entry with odometers lower than real baselines
-    const cleaned: Record<string, any> = {};
-    for (const [key, val] of Object.entries(parsed)) {
-      const entry = val as any;
-      if (entry && typeof entry === 'object' && entry.km_atuais) {
-        if (entry.matricula === 'AM-96-11' && entry.km_atuais < 98620) continue;
-        if (entry.matricula === 'AM-96-12' && entry.km_atuais < 105888) continue;
-        if (entry.matricula === 'AM-96-13' && entry.km_atuais < 102614) continue;
-        if (entry.km_atuais < 90000) continue;
-      }
-      cleaned[key] = val;
-    }
-    return cleaned;
-  } catch (err) {
-    return {};
-  }
+  // Always return empty object so Supabase online database values are 100% authoritative
+  return {};
 }
 
 export function saveFleetOverride(viaturaId: string, updates: Record<string, any>) {
