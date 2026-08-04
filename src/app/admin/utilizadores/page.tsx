@@ -111,7 +111,7 @@ export default function GestaoUtilizadoresPage() {
       let updatedList: UtilizadorLogistica[] = [];
 
       if (isEditing && editingId) {
-        const payload = {
+        const payloadWithPass = {
           nome,
           posto,
           especialidade,
@@ -120,11 +120,28 @@ export default function GestaoUtilizadoresPage() {
           password: userPass
         };
 
-        const { error } = await supabase.from('utilizadores_logistica').update(payload).eq('id', editingId);
-        if (error) console.warn('Erro/Aviso ao atualizar utilizador no Supabase:', error.message);
+        const payloadNoPass = {
+          nome,
+          posto,
+          especialidade,
+          email,
+          trigrama: triClean
+        };
 
-        updatedList = utilizadores.map((u) => (u.id === editingId ? { ...u, ...payload } : u));
-        setSuccessMsg(`Utilizador ${nome} [Trigrama: ${triClean}] atualizado com sucesso!`);
+        let { error } = await supabase.from('utilizadores_logistica').update(payloadWithPass).eq('id', editingId);
+        if (error && error.message.includes('password')) {
+          const retry = await supabase.from('utilizadores_logistica').update(payloadNoPass).eq('id', editingId);
+          error = retry.error;
+        }
+
+        if (error) {
+          console.warn('Erro/Aviso ao atualizar utilizador no Supabase:', error.message);
+          setErrorMsg(`Aviso Supabase: ${error.message}`);
+        } else {
+          setSuccessMsg(`Utilizador ${nome} [Trigrama: ${triClean}] atualizado no Supabase com sucesso!`);
+        }
+
+        updatedList = utilizadores.map((u) => (u.id === editingId ? { ...u, ...payloadWithPass } : u));
 
         logAuditAction(
           'UTILIZADORES',
@@ -132,7 +149,7 @@ export default function GestaoUtilizadoresPage() {
           `Alterou os dados/palavra-passe do gestor de logística [${triClean}] ${nome}.`
         );
       } else {
-        const newPayload = {
+        const newPayloadWithPass = {
           nome,
           posto,
           especialidade,
@@ -142,12 +159,31 @@ export default function GestaoUtilizadoresPage() {
           is_ativo: true
         };
 
-        const { data, error } = await supabase.from('utilizadores_logistica').insert([newPayload]).select();
-        if (error) console.warn('Erro/Aviso ao criar utilizador no Supabase:', error.message);
+        const newPayloadNoPass = {
+          nome,
+          posto,
+          especialidade,
+          email,
+          trigrama: triClean,
+          is_ativo: true
+        };
 
-        const createdU: UtilizadorLogistica = data && data.length > 0 ? data[0] : { id: `user-${Date.now()}`, ...newPayload };
+        let { data, error } = await supabase.from('utilizadores_logistica').insert([newPayloadWithPass]).select();
+        if (error && error.message.includes('password')) {
+          const retry = await supabase.from('utilizadores_logistica').insert([newPayloadNoPass]).select();
+          data = retry.data;
+          error = retry.error;
+        }
+
+        if (error) {
+          console.warn('Erro/Aviso ao criar utilizador no Supabase:', error.message);
+          setErrorMsg(`Aviso Supabase: ${error.message}`);
+        } else {
+          setSuccessMsg(`Novo utilizador de logística ${nome} [Trigrama: ${triClean}] criado no Supabase com sucesso!`);
+        }
+
+        const createdU: UtilizadorLogistica = data && data.length > 0 ? data[0] : { id: `user-${Date.now()}`, ...newPayloadWithPass };
         updatedList = [...utilizadores.filter((u) => u.id !== createdU.id), createdU];
-        setSuccessMsg(`Novo utilizador de logística ${nome} [Trigrama: ${triClean}] criado com sucesso!`);
 
         logAuditAction(
           'UTILIZADORES',
