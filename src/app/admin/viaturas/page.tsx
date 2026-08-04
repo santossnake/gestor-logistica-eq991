@@ -190,31 +190,37 @@ export default function AdminViaturasPage() {
     const prof = getStoredMilitaryProfile();
     const nowIso = new Date().toISOString();
 
-    saveFleetOverride(v.id, {
-      necessita_limpeza: false,
-      data_ultima_limpeza: nowIso,
-      limpo_por_nip: prof.nip || 'LOGÍSTICA'
-    });
-
     try {
-      await supabase
+      let { error } = await supabase
         .from('viaturas')
         .update({
           necessita_limpeza: false,
           data_ultima_limpeza: nowIso,
           limpo_por_nip: prof.nip || 'LOGÍSTICA'
         })
-        .eq('id', v.id);
+        .eq('matricula', v.matricula);
+
+      if (error) {
+        await supabase
+          .from('viaturas')
+          .update({
+            necessita_limpeza: false,
+            data_ultima_limpeza: nowIso,
+            limpo_por_nip: prof.nip || 'LOGÍSTICA'
+          })
+          .eq('id', v.id);
+      }
 
       setViaturas((prev) =>
         prev.map((item) =>
-          item.id === v.id
+          item.matricula === v.matricula || item.id === v.id
             ? { ...item, necessita_limpeza: false, data_ultima_limpeza: nowIso, limpo_por_nip: prof.nip || 'LOGÍSTICA' }
             : item
         )
       );
 
       alert(`Limpeza registada com sucesso na viatura ${v.matricula}!`);
+      logAuditAction('VIATURAS', 'Limpeza Registada', `Registada limpeza na viatura ${v.matricula}.`);
     } catch (err) {
       console.error(err);
     }
@@ -268,10 +274,13 @@ export default function AdminViaturasPage() {
       await supabase.from('registos_abastecimento').insert([refuelRec]);
 
       if (abastKm > targetVtrForRefuel.km_atuais) {
-        saveFleetOverride(targetVtrForRefuel.id, { km_atuais: abastKm });
-        await supabase.from('viaturas').update({ km_atuais: abastKm }).eq('id', targetVtrForRefuel.id);
+        let { error } = await supabase.from('viaturas').update({ km_atuais: abastKm }).eq('matricula', targetVtrForRefuel.matricula);
+        if (error) {
+          await supabase.from('viaturas').update({ km_atuais: abastKm }).eq('id', targetVtrForRefuel.id);
+        }
+
         setViaturas((prev) =>
-          prev.map((v) => (v.id === targetVtrForRefuel.id ? { ...v, km_atuais: abastKm } : v))
+          prev.map((v) => (v.matricula === targetVtrForRefuel.matricula || v.id === targetVtrForRefuel.id ? { ...v, km_atuais: abastKm } : v))
         );
       }
       alert(`Abastecimento de ${abastLitros}L registado na viatura ${targetVtrForRefuel.matricula}!`);
@@ -290,27 +299,28 @@ export default function AdminViaturasPage() {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const fullUrl = `${origin}/chave/${qrToken}`;
     navigator.clipboard.writeText(fullUrl);
-    setCopiedToken(qrToken);
-    setTimeout(() => setCopiedToken(null), 2500);
+    alert(`Link direto copiado para a área de transferência:\n${fullUrl}`);
   };
 
-  const handleToggleForcada = async (v: Viatura) => {
-    const newStatus = !v.is_forcada_recomendada;
+  const handleToggleForcadaRecomendada = async (v: Viatura) => {
     try {
+      const newStatus = !v.is_forcada_recomendada;
       if (newStatus) {
-        await supabase.from('viaturas').update({ is_forcada_recomendada: false }).neq('id', v.id);
+        await supabase.from('viaturas').update({ is_forcada_recomendada: false }).neq('matricula', v.matricula);
       }
-      await supabase.from('viaturas').update({ is_forcada_recomendada: newStatus }).eq('id', v.id);
+      let { error } = await supabase.from('viaturas').update({ is_forcada_recomendada: newStatus }).eq('matricula', v.matricula);
+      if (error) {
+        await supabase.from('viaturas').update({ is_forcada_recomendada: newStatus }).eq('id', v.id);
+      }
 
       setViaturas((prev) =>
         prev.map((item) => {
-          if (item.id === v.id) return { ...item, is_forcada_recomendada: newStatus };
+          if (item.matricula === v.matricula || item.id === v.id) return { ...item, is_forcada_recomendada: newStatus };
           if (newStatus) return { ...item, is_forcada_recomendada: false };
           return item;
         })
       );
 
-      saveFleetOverride(v.id, { is_forcada_recomendada: newStatus });
       logAuditAction(
         'VIATURAS',
         'Prioridade Viatura Recomendada',
@@ -322,11 +332,18 @@ export default function AdminViaturasPage() {
   };
 
   const handleDeleteViatura = async (id: string) => {
-    if (!confirm('Tem a certeza que deseja apagar esta viatura da frota?')) return;
+    const target = viaturas.find((v) => v.id === id);
+    const targetMat = target ? target.matricula : id;
+
+    if (!confirm(`Tem a certeza que deseja apagar a viatura ${targetMat} da frota?`)) return;
     try {
-      await supabase.from('viaturas').delete().eq('id', id);
-      setViaturas((prev) => prev.filter((v) => v.id !== id));
+      let { error } = await supabase.from('viaturas').delete().eq('matricula', targetMat);
+      if (error) {
+        await supabase.from('viaturas').delete().eq('id', id);
+      }
+      setViaturas((prev) => prev.filter((v) => v.id !== id && v.matricula !== targetMat));
       if (selectedViaturaId === id) setSelectedViaturaId('TODAS');
+      logAuditAction('VIATURAS', 'Eliminação de Viatura', `Apagada a viatura ${targetMat} da frota.`);
     } catch (err) {
       console.error(err);
     }
@@ -391,13 +408,13 @@ export default function AdminViaturasPage() {
     const newToken = editingViatura ? editingViatura.qr_code_token : `VTR-991-${Math.floor(10 + Math.random() * 90)}`;
 
     const vData = {
-      matricula,
-      modelo,
+      matricula: matricula.trim(),
+      modelo: modelo.trim(),
       num_lugares: numLugares,
       tem_gancho_reboque: temGancho,
       km_atuais: kmAtuais,
-      localizacao_atual_viatura: localViatura,
-      localizacao_atual_chave: localChave,
+      localizacao_atual_viatura: localViatura.trim(),
+      localizacao_atual_chave: localChave.trim(),
       km_proxima_revisao: kmProximaRevisao,
       data_proxima_revisao: dataProximaRevisao,
       latitude_atual: 39.0920,
@@ -406,18 +423,19 @@ export default function AdminViaturasPage() {
 
     try {
       if (editingViatura) {
-        let { error } = await supabase.from('viaturas').update(vData).eq('id', editingViatura.id);
+        // First try updating by matricula (unique text field), then by id!
+        let { error } = await supabase.from('viaturas').update(vData).eq('matricula', editingViatura.matricula);
         if (error) {
-          console.warn('Tentando atualizar viatura no Supabase por matrícula:', error.message);
-          const retry = await supabase.from('viaturas').update(vData).eq('matricula', matricula);
+          const retry = await supabase.from('viaturas').update(vData).eq('id', editingViatura.id);
           error = retry.error;
         }
 
         if (error) {
           console.warn('Erro ao atualizar viatura no Supabase:', error.message);
+          alert(`Aviso Supabase ao atualizar viatura: ${error.message}`);
+        } else {
+          alert(`Viatura ${vData.matricula} atualizada no Supabase com sucesso!`);
         }
-
-        setViaturas((prev) => prev.map((v) => (v.id === editingViatura.id || v.matricula === matricula ? { ...v, ...vData } : v)));
       } else {
         const newRecord = {
           qr_code_token: newToken,
@@ -425,12 +443,28 @@ export default function AdminViaturasPage() {
           is_forcada_recomendada: false,
           ...vData
         };
-        const { data, error } = await supabase.from('viaturas').insert([newRecord]).select();
+
+        const { error } = await supabase.from('viaturas').insert([newRecord]);
         if (error) {
           console.warn('Erro ao criar viatura no Supabase:', error.message);
+          alert(`Aviso Supabase ao criar viatura: ${error.message}`);
+        } else {
+          alert(`Nova viatura ${vData.matricula} criada no Supabase com sucesso!`);
         }
-        const createdVtr = data && data.length > 0 ? data[0] : { id: `vtr-${Date.now()}`, ...newRecord };
-        setViaturas((prev) => [...prev, createdVtr as any]);
+      }
+
+      // Re-fetch clean list directly from Supabase
+      const { data: refreshedVtrs } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
+      if (refreshedVtrs && refreshedVtrs.length > 0) {
+        setViaturas(refreshedVtrs);
+      } else {
+        setViaturas((prev) =>
+          prev.map((v) =>
+            editingViatura && (v.id === editingViatura.id || v.matricula === editingViatura.matricula)
+              ? { ...v, ...vData }
+              : v
+          )
+        );
       }
 
       logAuditAction(
@@ -440,8 +474,9 @@ export default function AdminViaturasPage() {
       );
 
       setIsModalOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(`Erro ao guardar viatura: ${err.message}`);
     }
   };
 
@@ -711,7 +746,7 @@ export default function AdminViaturasPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleToggleForcada(v);
+                      handleToggleForcadaRecomendada(v);
                     }}
                     className={`w-full py-2 px-3 rounded-lg text-xs font-bold font-mono flex items-center justify-center space-x-2 border transition-all ${
                       v.is_forcada_recomendada
