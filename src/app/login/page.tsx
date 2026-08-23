@@ -3,9 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, Lock, KeyRound, ArrowRight, UserCheck } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { MOCK_UTILIZADORES_LOGISTICA } from '@/lib/mock-data';
-import { logAuditAction } from '@/lib/utils/cookies';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { getStoredUtilizadores, logAuditAction } from '@/lib/utils/cookies';
 
 export default function LoginPage() {
   const [trigramaOuEmail, setTrigramaOuEmail] = useState<string>('OLV');
@@ -26,10 +25,27 @@ export default function LoginPage() {
     const inputPass = password.trim();
 
     try {
-      const { data: dbUsers } = await supabase.from('utilizadores_logistica').select('*');
-      const user = dbUsers?.find(
-        (u: any) => u.trigrama?.toUpperCase() === loginInput || u.email?.toUpperCase() === loginInput
-      );
+      let user: any = null;
+
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: dbUsers } = await supabase.from('utilizadores_logistica').select('*');
+          if (dbUsers) {
+            user = dbUsers.find(
+              (u: any) => u.trigrama?.toUpperCase() === loginInput || u.email?.toUpperCase() === loginInput
+            );
+          }
+        } catch (netErr: any) {
+          console.warn('Erro de rede ao consultar utilizadores no Supabase:', netErr);
+        }
+      }
+
+      if (!user) {
+        const storedUsers = getStoredUtilizadores();
+        user = storedUsers.find(
+          (u: any) => u.trigrama?.toUpperCase() === loginInput || u.email?.toUpperCase() === loginInput
+        );
+      }
 
       const validPassword = user?.password || '123456';
 
@@ -48,6 +64,7 @@ export default function LoginPage() {
         setErrorMsg(`Palavra-passe incorreta para o Trigrama [${loginInput}]. (Nota: A palavra-passe por defeito é 123456).`);
       }
     } catch (err: any) {
+      console.error(err);
       setErrorMsg(err.message || 'Erro ao efetuar autenticação.');
     } finally {
       setLoading(false);

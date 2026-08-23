@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Shield, Mail, KeyRound, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, RefreshCw, Badge } from 'lucide-react';
-import { supabase, UtilizadorLogistica } from '@/lib/supabase/client';
+import { supabase, isSupabaseConfigured, UtilizadorLogistica } from '@/lib/supabase/client';
 import { MOCK_UTILIZADORES_LOGISTICA } from '@/lib/mock-data';
 import { POSTOS_FORCA_AEREA, getStoredUtilizadores, saveStoredUtilizadores, logAuditAction } from '@/lib/utils/cookies';
 
@@ -31,16 +31,18 @@ export default function GestaoUtilizadoresPage() {
 
   async function loadUsers() {
     try {
-      const { data, error } = await supabase.from('utilizadores_logistica').select('*').order('created_at', { ascending: true });
-      if (!error && data && data.length > 0) {
-        setUtilizadores(data);
-        saveStoredUtilizadores(data);
-      } else {
-        const stored = getStoredUtilizadores();
-        setUtilizadores(stored);
+      if (isSupabaseConfigured()) {
+        const { data, error } = await supabase.from('utilizadores_logistica').select('*').order('created_at', { ascending: true });
+        if (!error && data && data.length > 0) {
+          setUtilizadores(data);
+          saveStoredUtilizadores(data);
+          return;
+        }
       }
+      const stored = getStoredUtilizadores();
+      setUtilizadores(stored);
     } catch (err) {
-      console.error(err);
+      console.warn('Supabase não disponível, a carregar utilizadores guardados:', err);
       const stored = getStoredUtilizadores();
       setUtilizadores(stored);
     } finally {
@@ -128,20 +130,19 @@ export default function GestaoUtilizadoresPage() {
           trigrama: triClean
         };
 
-        let { error } = await supabase.from('utilizadores_logistica').update(payloadWithPass).eq('id', editingId);
-        if (error && error.message.includes('password')) {
-          const retry = await supabase.from('utilizadores_logistica').update(payloadNoPass).eq('id', editingId);
-          error = retry.error;
-        }
-
-        if (error) {
-          console.warn('Erro/Aviso ao atualizar utilizador no Supabase:', error.message);
-          setErrorMsg(`Aviso Supabase: ${error.message}`);
-        } else {
-          setSuccessMsg(`Utilizador ${nome} [Trigrama: ${triClean}] atualizado no Supabase com sucesso!`);
+        if (isSupabaseConfigured()) {
+          try {
+            let { error } = await supabase.from('utilizadores_logistica').update(payloadWithPass).eq('id', editingId);
+            if (error && error.message.includes('password')) {
+              await supabase.from('utilizadores_logistica').update(payloadNoPass).eq('id', editingId);
+            }
+          } catch (netErr: any) {
+            console.warn('Erro de rede ao comunicar com Supabase:', netErr);
+          }
         }
 
         updatedList = utilizadores.map((u) => (u.id === editingId ? { ...u, ...payloadWithPass } : u));
+        setSuccessMsg(`Utilizador ${nome} [Trigrama: ${triClean}] atualizado com sucesso!`);
 
         logAuditAction(
           'UTILIZADORES',
@@ -168,22 +169,24 @@ export default function GestaoUtilizadoresPage() {
           is_ativo: true
         };
 
-        let { data, error } = await supabase.from('utilizadores_logistica').insert([newPayloadWithPass]).select();
-        if (error && error.message.includes('password')) {
-          const retry = await supabase.from('utilizadores_logistica').insert([newPayloadNoPass]).select();
-          data = retry.data;
-          error = retry.error;
+        let createdItemFromDb: any = null;
+
+        if (isSupabaseConfigured()) {
+          try {
+            let { data, error } = await supabase.from('utilizadores_logistica').insert([newPayloadWithPass]).select();
+            if (error && error.message.includes('password')) {
+              const retry = await supabase.from('utilizadores_logistica').insert([newPayloadNoPass]).select();
+              data = retry.data;
+            }
+            if (data && data.length > 0) createdItemFromDb = data[0];
+          } catch (netErr: any) {
+            console.warn('Erro de rede ao comunicar com Supabase:', netErr);
+          }
         }
 
-        if (error) {
-          console.warn('Erro/Aviso ao criar utilizador no Supabase:', error.message);
-          setErrorMsg(`Aviso Supabase: ${error.message}`);
-        } else {
-          setSuccessMsg(`Novo utilizador de logística ${nome} [Trigrama: ${triClean}] criado no Supabase com sucesso!`);
-        }
-
-        const createdU: UtilizadorLogistica = data && data.length > 0 ? data[0] : { id: `user-${Date.now()}`, ...newPayloadWithPass };
+        const createdU: UtilizadorLogistica = createdItemFromDb || { id: `user-${Date.now()}`, ...newPayloadWithPass };
         updatedList = [...utilizadores.filter((u) => u.id !== createdU.id), createdU];
+        setSuccessMsg(`Novo utilizador de logística ${nome} [Trigrama: ${triClean}] criado com sucesso!`);
 
         logAuditAction(
           'UTILIZADORES',
@@ -196,6 +199,7 @@ export default function GestaoUtilizadoresPage() {
       saveStoredUtilizadores(updatedList);
       resetForm();
     } catch (err: any) {
+      console.error(err);
       setErrorMsg(err.message || 'Erro ao guardar utilizador.');
     } finally {
       setIsSubmitting(false);
@@ -208,8 +212,13 @@ export default function GestaoUtilizadoresPage() {
     }
 
     try {
-      const { error } = await supabase.from('utilizadores_logistica').delete().eq('id', id);
-      if (error) console.warn('Erro/Aviso ao apagar utilizador no Supabase:', error.message);
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('utilizadores_logistica').delete().eq('id', id);
+        } catch (netErr: any) {
+          console.warn('Erro de rede ao apagar no Supabase:', netErr);
+        }
+      }
 
       const updatedList = utilizadores.filter((u) => u.id !== id);
       setUtilizadores(updatedList);
@@ -229,8 +238,14 @@ export default function GestaoUtilizadoresPage() {
   const toggleStatus = async (u: UtilizadorLogistica) => {
     try {
       const newStatus = !u.is_ativo;
-      const { error } = await supabase.from('utilizadores_logistica').update({ is_ativo: newStatus }).eq('id', u.id);
-      if (error) console.warn('Erro/Aviso ao alterar estado no Supabase:', error.message);
+
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('utilizadores_logistica').update({ is_ativo: newStatus }).eq('id', u.id);
+        } catch (netErr: any) {
+          console.warn('Erro de rede ao atualizar estado no Supabase:', netErr);
+        }
+      }
 
       const updatedList = utilizadores.map((item) => (item.id === u.id ? { ...item, is_ativo: newStatus } : item));
       setUtilizadores(updatedList);
