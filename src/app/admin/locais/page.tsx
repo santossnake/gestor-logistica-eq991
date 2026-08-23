@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MapPin, Key, Plus, CheckCircle2, Shield, Trash2, Edit2, Sparkles, AlertCircle } from 'lucide-react';
-import { supabase, LocalItem } from '@/lib/supabase/client';
+import { supabase, isSupabaseConfigured, LocalItem } from '@/lib/supabase/client';
 import { getStoredLocais, saveStoredLocais, deleteStoredLocal, logAuditAction } from '@/lib/utils/cookies';
 
 export default function LocaisAdminPage() {
@@ -23,16 +23,18 @@ export default function LocaisAdminPage() {
   useEffect(() => {
     async function fetchLocais() {
       try {
-        const { data, error } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
-        if (!error && data && data.length > 0) {
-          setLocais(data);
-          saveStoredLocais(data);
-        } else {
-          const stored = getStoredLocais();
-          setLocais(stored);
+        if (isSupabaseConfigured()) {
+          const { data, error } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
+          if (!error && data && data.length > 0) {
+            setLocais(data);
+            saveStoredLocais(data);
+            return;
+          }
         }
+        const stored = getStoredLocais();
+        setLocais(stored);
       } catch (err) {
-        console.error(err);
+        console.warn('Supabase não disponível, a carregar locais do armazenamento local:', err);
         const stored = getStoredLocais();
         setLocais(stored);
       } finally {
@@ -68,10 +70,6 @@ export default function LocaisAdminPage() {
     setSuccessMsg('');
 
     try {
-      if (isPredefinidoInput) {
-        await supabase.from('locais').update({ is_predefinido: false }).eq('tipo', tipoInput);
-      }
-
       let updatedList: LocalItem[] = [];
 
       if (editingId) {
@@ -82,16 +80,22 @@ export default function LocaisAdminPage() {
           is_predefinido: isPredefinidoInput
         };
 
-        // 1. Send update to Supabase
-        const { error } = await supabase.from('locais').update(payload).eq('id', editingId);
-        if (error) {
-          console.warn('Erro/Aviso ao atualizar no Supabase:', error.message);
-          setErrorMsg(`Nota de Sincronização Supabase: ${error.message}`);
-        } else {
-          setSuccessMsg(`Local "${nomeInput}" atualizado no Supabase com sucesso!`);
+        if (isSupabaseConfigured()) {
+          try {
+            if (isPredefinidoInput) {
+              await supabase.from('locais').update({ is_predefinido: false }).eq('tipo', tipoInput);
+            }
+            const { error } = await supabase.from('locais').update(payload).eq('id', editingId);
+            if (error) {
+              console.warn('Aviso Supabase ao atualizar:', error.message);
+            } else {
+              setSuccessMsg(`Local "${nomeInput}" atualizado no Supabase com sucesso!`);
+            }
+          } catch (netErr: any) {
+            console.warn('Erro de rede ao comunicar com Supabase:', netErr);
+          }
         }
 
-        // 2. Update local state and mirror
         updatedList = locais.map((l) => {
           if (l.id === editingId) {
             return { ...l, ...payload };
@@ -112,15 +116,26 @@ export default function LocaisAdminPage() {
           is_ativo: true
         };
 
-        const { data, error } = await supabase.from('locais').insert([payload]).select();
-        if (error) {
-          console.warn('Erro/Aviso ao criar no Supabase:', error.message);
-          setErrorMsg(`Nota de Sincronização Supabase: ${error.message}`);
-        } else {
-          setSuccessMsg(`Novo local "${nomeInput}" adicionado no Supabase com sucesso!`);
+        let createdItemFromDb: any = null;
+
+        if (isSupabaseConfigured()) {
+          try {
+            if (isPredefinidoInput) {
+              await supabase.from('locais').update({ is_predefinido: false }).eq('tipo', tipoInput);
+            }
+            const { data, error } = await supabase.from('locais').insert([payload]).select();
+            if (error) {
+              console.warn('Aviso Supabase ao criar:', error.message);
+            } else if (data && data.length > 0) {
+              createdItemFromDb = data[0];
+              setSuccessMsg(`Novo local "${nomeInput}" adicionado no Supabase com sucesso!`);
+            }
+          } catch (netErr: any) {
+            console.warn('Erro de rede ao comunicar com Supabase:', netErr);
+          }
         }
 
-        const created = data && data.length > 0 ? data[0] : { id: `loc-${Date.now()}`, ...payload };
+        const created = createdItemFromDb || { id: `loc-${Date.now()}`, ...payload };
 
         updatedList = [
           ...locais.map((l) => (isPredefinidoInput && l.tipo === tipoInput ? { ...l, is_predefinido: false } : l)),
@@ -133,14 +148,7 @@ export default function LocaisAdminPage() {
       setLocais(updatedList);
       saveStoredLocais(updatedList);
 
-      // Re-sync with Supabase
-      const { data: refreshed, error: refErr } = await supabase.from('locais').select('*').order('created_at', { ascending: true });
-      if (!refErr && refreshed && refreshed.length > 0) {
-        setLocais(refreshed);
-        saveStoredLocais(refreshed);
-      }
-
-      if (!errorMsg) setIsModalOpen(false);
+      setIsModalOpen(false);
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || 'Erro ao guardar local.');
