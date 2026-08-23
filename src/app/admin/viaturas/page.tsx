@@ -25,7 +25,7 @@ import {
   Wrench,
   RotateCcw
 } from 'lucide-react';
-import { supabase, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
+import { supabase, isSupabaseConfigured, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_GPS, MOCK_LOCAIS } from '@/lib/mock-data';
 import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride, getStoredLocais, saveStoredLocais, logAuditAction } from '@/lib/utils/cookies';
 
@@ -424,78 +424,73 @@ export default function AdminViaturasPage() {
       longitude_atual: -8.9680
     };
 
-    try {
-      if (editingViatura) {
-        // 1. Try full payload matching by matricula
-        let { error } = await supabase.from('viaturas').update(vData).eq('matricula', editingViatura.matricula);
+    if (isSupabaseConfigured()) {
+      try {
+        if (editingViatura) {
+          // 1. Try full payload matching by matricula
+          let { error } = await supabase.from('viaturas').update(vData).eq('matricula', editingViatura.matricula);
 
-        // 2. If data_proxima_revisao column is missing in Supabase, retry without date field
-        if (error && error.message.includes('data_proxima_revisao')) {
-          const { data_proxima_revisao, ...vDataClean } = vData;
-          const retry = await supabase.from('viaturas').update(vDataClean).eq('matricula', editingViatura.matricula);
-          error = retry.error;
-        }
+          // 2. If data_proxima_revisao column is missing in Supabase, retry without date field
+          if (error && error.message.includes('data_proxima_revisao')) {
+            const { data_proxima_revisao, ...vDataClean } = vData;
+            const retry = await supabase.from('viaturas').update(vDataClean).eq('matricula', editingViatura.matricula);
+            error = retry.error;
+          }
 
-        // 3. Retry matching by ID if matricula didn't match
-        if (error) {
-          const retryId = await supabase.from('viaturas').update(vData).eq('id', editingViatura.id);
-          error = retryId.error;
-        }
+          // 3. Retry matching by ID if matricula didn't match
+          if (error) {
+            const retryId = await supabase.from('viaturas').update(vData).eq('id', editingViatura.id);
+            error = retryId.error;
+          }
 
-        if (error) {
-          console.warn('Erro ao atualizar viatura no Supabase:', error.message);
-          alert(`Aviso Supabase ao atualizar viatura: ${error.message}`);
+          if (error) {
+            console.warn('Aviso Supabase ao atualizar viatura:', error.message);
+          }
         } else {
-          alert(`Viatura ${vData.matricula} atualizada no Supabase com sucesso!`);
-        }
-      } else {
-        const newRecord = {
-          qr_code_token: newToken,
-          estado: 'DISPONIVEL',
-          is_forcada_recomendada: false,
-          ...vData
-        };
+          const newRecord = {
+            qr_code_token: newToken,
+            estado: 'DISPONIVEL',
+            is_forcada_recomendada: false,
+            ...vData
+          };
 
-        let { error } = await supabase.from('viaturas').insert([newRecord]);
-        if (error && error.message.includes('data_proxima_revisao')) {
-          const { data_proxima_revisao, ...recClean } = newRecord;
-          const retry = await supabase.from('viaturas').insert([recClean]);
-          error = retry.error;
+          let { error } = await supabase.from('viaturas').insert([newRecord]);
+          if (error && error.message.includes('data_proxima_revisao')) {
+            const { data_proxima_revisao, ...recClean } = newRecord;
+            const retry = await supabase.from('viaturas').insert([recClean]);
+            error = retry.error;
+          }
+
+          if (error) {
+            console.warn('Aviso Supabase ao criar viatura:', error.message);
+          }
         }
 
-        if (error) {
-          console.warn('Erro ao criar viatura no Supabase:', error.message);
-          alert(`Aviso Supabase ao criar viatura: ${error.message}`);
-        } else {
-          alert(`Nova viatura ${vData.matricula} criada no Supabase com sucesso!`);
+        // Re-fetch clean list directly from Supabase
+        const { data: refreshedVtrs } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
+        if (refreshedVtrs && refreshedVtrs.length > 0) {
+          setViaturas(refreshedVtrs);
         }
+      } catch (netErr: any) {
+        console.warn('Erro de rede ao comunicar com o Supabase:', netErr);
       }
-
-      // Re-fetch clean list directly from Supabase
-      const { data: refreshedVtrs } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
-      if (refreshedVtrs && refreshedVtrs.length > 0) {
-        setViaturas(refreshedVtrs);
-      } else {
-        setViaturas((prev) =>
-          prev.map((v) =>
-            editingViatura && (v.id === editingViatura.id || v.matricula === editingViatura.matricula)
-              ? { ...v, ...vData }
-              : v
-          )
-        );
-      }
-
-      logAuditAction(
-        'VIATURAS',
-        'Atualização de Frota',
-        `Atualizados dados/odómetro da viatura ${vData.matricula} (${vData.km_atuais} KM, local viatura: ${vData.localizacao_atual_viatura}, chave: ${vData.localizacao_atual_chave}).`
-      );
-
-      setIsModalOpen(false);
-    } catch (err: any) {
-      console.error(err);
-      alert(`Erro ao guardar viatura: ${err.message}`);
     }
+
+    setViaturas((prev) =>
+      prev.map((v) =>
+        editingViatura && (v.id === editingViatura.id || v.matricula === editingViatura.matricula)
+          ? { ...v, ...vData }
+          : v
+      )
+    );
+
+    logAuditAction(
+      'VIATURAS',
+      'Atualização de Frota',
+      `Atualizados dados/odómetro da viatura ${vData.matricula} (${vData.km_atuais} KM, local viatura: ${vData.localizacao_atual_viatura}, chave: ${vData.localizacao_atual_chave}).`
+    );
+
+    setIsModalOpen(false);
   };
 
   return (
