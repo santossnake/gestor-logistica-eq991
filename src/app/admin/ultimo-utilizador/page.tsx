@@ -55,11 +55,11 @@ export default function UltimoUtilizadorPage() {
         if (mData && mData.length > 0) {
           setUltimoRegisto(mData[0]);
           setNipDest(mData[0].nip_fim || mData[0].nip_inicio);
-          setEmailDest(`${mData[0].nip_fim || mData[0].nip_inicio}@emfa.pt`);
+          setEmailDest(`${mData[0].nip_fim || mData[0].nip_inicio}@emfa.gov.pt`);
         } else {
           setUltimoRegisto(MOCK_MARCHAS[0]);
           setNipDest(MOCK_MARCHAS[0].nip_fim || MOCK_MARCHAS[0].nip_inicio);
-          setEmailDest('militar@emfa.pt');
+          setEmailDest('militar@emfa.gov.pt');
         }
       } catch (err) {
         console.error(err);
@@ -252,14 +252,26 @@ export default function UltimoUtilizadorPage() {
           </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={isSending}
-          className="w-full py-3.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-amber-950 flex items-center justify-center space-x-2 transition-all"
-        >
-          <Send className="w-4 h-4" />
-          <span>{isSending ? 'A enviar notificação...' : '📧 Enviar Notificação Direta'}</span>
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="submit"
+            disabled={isSending}
+            className="flex-1 py-3.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-amber-950 flex items-center justify-center space-x-2 transition-all"
+          >
+            <Send className="w-4 h-4" />
+            <span>{isSending ? 'A registar notificação...' : 'Registar Notificação no Sistema'}</span>
+          </button>
+
+          <a
+            href={`mailto:${emailDest || 'militar@emfa.gov.pt'}?subject=${encodeURIComponent(motivo)}&body=${encodeURIComponent(mensagem)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex-1 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-blue-950 flex items-center justify-center space-x-2 transition-all"
+          >
+            <Mail className="w-4 h-4" />
+            <span>Abrir Cliente de Email (@emfa.gov.pt) ✉️</span>
+          </a>
+        </div>
       </form>
     </div>
   );

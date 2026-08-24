@@ -693,7 +693,7 @@ export default function AdminDashboardPage() {
                     Este pedido necessita de reboque. Clique abaixo para enviar o email pré-criado para a manutenção:
                   </p>
                   <a
-                    href={`mailto:manutencao.reboques.eq991@emfa.pt?subject=${encodeURIComponent(
+                    href={`mailto:manutencao.reboques.eq991@emfa.gov.pt?subject=${encodeURIComponent(
                       `Esquadra 991 - ALERTA DE REBOQUE: Pedido Aprovado (${approvingPedido.destino})`
                     )}&body=${encodeURIComponent(
                       `À Equipa de Manutenção de Reboques,\n\nInformamos que o pedido de reserva do militar ${approvingPedido.posto} ${approvingPedido.nome_utilizador} [NIP ${approvingPedido.nip}] para o destino ${approvingPedido.destino} foi APROVADO com necessidade de GANCHO DE REBOQUE.\n\nViatura Atribuída: ${viaturas.find((v) => v.id === selectedViaturaIdForApproval)?.matricula || 'AM-96-11'}\nPeríodo: ${new Date(approvingPedido.data_inicio).toLocaleString()} até ${new Date(approvingPedido.data_fim).toLocaleString()}\n\nFavor preparar a viatura e o equipamento de reboque.\n\nCumprimentos,\nLogística Esquadra 991`
@@ -703,7 +703,7 @@ export default function AdminDashboardPage() {
                     className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center space-x-2 shadow-md transition-colors"
                   >
                     <Truck className="w-4 h-4" />
-                    <span>🚛 Enviar Email à Manutenção de Reboques</span>
+                    <span>🚛 Abrir Cliente de Email (Manutenção de Reboques @emfa.gov.pt)</span>
                   </a>
                 </div>
               )}
@@ -740,7 +740,7 @@ export default function AdminDashboardPage() {
 
               <div className="pt-2 space-y-2">
                 <a
-                  href={`mailto:${approvingPedido.email || 'militar@emfa.pt'}?subject=${encodeURIComponent(
+                  href={`mailto:${approvingPedido.email || 'militar@emfa.gov.pt'}?subject=${encodeURIComponent(
                     `Esquadra 991 - Pedido de Viatura APROVADO [${approvingPedido.destino}]`
                   )}&body=${encodeURIComponent(
                     `Exmo. Militar ${approvingPedido.posto} ${approvingPedido.nome_utilizador},\n\nInformamos que o seu pedido de reserva de viatura com destino a ${approvingPedido.destino} foi APROVADO.\n\nViatura Atribuída: ${viaturas.find((v) => v.id === selectedViaturaIdForApproval)?.matricula || 'AM-96-11'}\nPeríodo: ${new Date(approvingPedido.data_inicio).toLocaleString()} até ${new Date(approvingPedido.data_fim).toLocaleString()}\n\nÀ chegada ao chaveiro, utilize a opção de desbloqueio de viatura.\n\nCumprimentos,\nLogística Esquadra 991`
@@ -750,7 +750,7 @@ export default function AdminDashboardPage() {
                   className="w-full py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-md transition-colors"
                 >
                   <Mail className="w-4 h-4" />
-                  <span>📧 Enviar Email de Notificação via Cliente de Email</span>
+                  <span>📧 Abrir Cliente de Email (Notificar Militar @emfa.gov.pt)</span>
                 </a>
               </div>
 

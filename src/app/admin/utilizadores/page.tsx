@@ -359,7 +359,7 @@ export default function GestaoUtilizadoresPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Ex: oliveira@emfa.pt"
+              placeholder="Ex: oliveira@emfa.gov.pt"
               className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 font-mono"
             />
           </div>

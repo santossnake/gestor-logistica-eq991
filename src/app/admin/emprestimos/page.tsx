@@ -283,7 +283,7 @@ export default function EmprestimosPage() {
                 required
                 value={emailResp}
                 onChange={(e) => setEmailResp(e.target.value)}
-                placeholder="Ex: ferreira@emfa.pt"
+                placeholder="Ex: ferreira@emfa.gov.pt"
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
               />
             </div>
@@ -308,49 +308,19 @@ export default function EmprestimosPage() {
               <Camera className="w-4 h-4" />
               <span>2. Auto de Vistoria Fotográfico Obrigatório (6+ Ângulos)</span>
             </h2>
-            <span className="text-xs font-mono text-emerald-400 font-bold">
-              {Object.keys(fotosUpload).length} / 6 fotografias recolhidas
-            </span>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {ANGULOS_INSPECAO.map((ang) => {
-              const preview = fotosUpload[ang.id];
-
-              return (
-                <div key={ang.id} className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                  <span className="text-xs font-bold text-slate-300 block">{ang.label}</span>
-
-                  {preview ? (
-                    <div className="relative group">
-                      <img src={preview} alt={ang.label} className="w-full h-28 object-cover rounded-lg border border-slate-700" />
-                      <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <label className="px-3 py-1 bg-cyan-600 text-white rounded text-xs font-bold cursor-pointer">
-                          Substituir
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleSimularUploadFoto(ang.id, e)}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  ) : (
-                    <label className="w-full h-28 border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-lg flex flex-col items-center justify-center cursor-pointer bg-slate-950/50 transition-colors">
-                      <Camera className="w-6 h-6 text-slate-500 mb-1" />
-                      <span className="text-[11px] text-slate-400 font-medium">Carregar / Fotografar</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleSimularUploadFoto(ang.id, e)}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {ANGULOS_INSPECAO.map((ang: any) => (
+              <div key={ang.id} className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                <span className="text-[11px] font-mono text-slate-300 font-bold block">{ang.label}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleSimularUploadFoto(ang.id, e)}
+                  className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-purple-900/60 file:text-purple-300 hover:file:bg-purple-800 cursor-pointer"
+                />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -385,9 +355,25 @@ export default function EmprestimosPage() {
                       <span className="text-xs font-bold text-purple-400 font-mono">{emp.entidade_externa}</span>
                       <h3 className="text-sm font-semibold text-slate-100">{emp.nome_responsavel} ({emp.contacto_responsavel})</h3>
                     </div>
-                    <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-purple-950 text-purple-300 border border-purple-800">
-                      {emp.estado}
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      {emp.email_responsavel && (
+                        <a
+                          href={`mailto:${emp.email_responsavel}?subject=${encodeURIComponent(
+                            `Esquadra 991 - Notificação de Cedência Externa (${emp.entidade_externa})`
+                          )}&body=${encodeURIComponent(
+                            `Exmo(a). Sr(a). ${emp.nome_responsavel} [${emp.entidade_externa}],\n\nInformamos que o processo de cedência externa de viatura encontra-se ativo com data prevista de devolução: ${new Date(emp.data_fim_prevista).toLocaleString()}.\n\nContacto Registado: ${emp.contacto_responsavel}\n\nCumprimentos,\nLogística Esquadra 991`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-blue-950 text-blue-300 border border-blue-800 flex items-center space-x-1"
+                        >
+                          <span>Email ✉️</span>
+                        </a>
+                      )}
+                      <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-purple-950 text-purple-300 border border-purple-800">
+                        {emp.estado}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Photo comparison preview */}

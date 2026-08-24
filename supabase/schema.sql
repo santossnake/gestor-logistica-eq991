@@ -254,9 +254,9 @@ CREATE TABLE IF NOT EXISTS public.utilizadores_logistica (
 
 -- Seed de exemplo utilizadores logística
 INSERT INTO public.utilizadores_logistica (nome, posto, especialidade, email, trigrama, is_ativo) VALUES
-('Manuel Oliveira', 'Sargento-Ajudante', 'MELECA', 'logistica.eq991@emfa.pt', 'OLV', true),
-('António Ferreira', 'Tenente', 'LOGISTICA', 'ferreira.eq991@emfa.pt', 'FER', true),
-('João Silva', 'Capitão', 'MELIA', 'silva.eq991@emfa.pt', 'SIL', true);
+('Manuel Oliveira', 'Sargento-Ajudante', 'MELECA', 'logistica.eq991@emfa.gov.pt', 'OLV', true),
+('António Ferreira', 'Tenente', 'LOGISTICA', 'ferreira.eq991@emfa.gov.pt', 'FER', true),
+('João Silva', 'Capitão', 'MELIA', 'silva.eq991@emfa.gov.pt', 'SIL', true);
 
 ALTER TABLE public.utilizadores_logistica ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Permitir Acesso Utilizadores Logistica" ON public.utilizadores_logistica FOR ALL USING (true);

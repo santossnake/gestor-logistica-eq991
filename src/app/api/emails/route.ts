@@ -5,7 +5,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { tipo, emailDestinatario, nip, nome, destino, dataInicio, dataFim, necessitaReboque, matricula, nivelCombustivel, descricao, gravidade, motivo, mensagem, entidade, nomeResp, dataFimPrevista } = body;
 
-    const toEmail = emailDestinatario || 'logistica.eq991@emfa.pt';
+    const toEmail = emailDestinatario || 'logistica.eq991@emfa.gov.pt';
     console.log(`[EMAIL API] A processar disparo de email do tipo: ${tipo} para ${toEmail}`);
 
     let subject = 'Esquadra 991 - Notificação do Sistema de Viaturas';

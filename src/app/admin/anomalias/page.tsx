@@ -136,7 +136,22 @@ export default function AnomaliasPage() {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-slate-800 text-xs font-mono">
                   <span className="text-slate-500">Registado em: {new Date(a.created_at).toLocaleString()}</span>
 
-                  <div className="flex items-center space-x-2 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <a
+                      href={`mailto:manutencao.eq991@emfa.gov.pt?subject=${encodeURIComponent(
+                        `Esquadra 991 - ALERTA DE ANOMALIA (${v?.matricula || 'AM-96-12'}): ${a.gravidade}`
+                      )}&body=${encodeURIComponent(
+                        `À Equipa de Manutenção da Esquadra 991,\n\nFoi registada uma anomalia na viatura com a matrícula ${v?.matricula || 'AM-96-12'} (${v?.modelo || 'Nissan Navara'}).\n\n- GRAVIDADE: ${a.gravidade}\n- ESTADO: ${a.estado_anomalia}\n- DATA REGISTO: ${new Date(a.created_at).toLocaleString()}\n\nDESCRIÇÃO DO INCIDENTE:\n${a.descricao}\n\nFavor proceder à verificação técnica do veículo.\n\nCumprimentos,\nLogística Esquadra 991`
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-[11px] font-bold border border-amber-800 flex items-center space-x-1.5 transition-colors"
+                      title="Abrir cliente de email nativo pré-preenchido para a Manutenção (@emfa.gov.pt)"
+                    >
+                      <Wrench className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Notificar Manutenção ✉️</span>
+                    </a>
+
                     <button
                       onClick={() => updateEstadoAnomalia(a.id, 'EM_RESOLUCAO')}
                       className="px-3 py-1.5 rounded bg-blue-950 hover:bg-blue-900 text-blue-300 text-[11px] font-bold border border-blue-800"
