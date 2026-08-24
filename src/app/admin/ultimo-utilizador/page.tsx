@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserCheck, Mail, Send, AlertTriangle, CheckCircle2, Shield, Car, Calendar } from 'lucide-react';
-import { supabase, Viatura, RegistoMarcha } from '@/lib/supabase/client';
+import { supabase, isSupabaseConfigured, Viatura, RegistoMarcha } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_MARCHAS } from '@/lib/mock-data';
+import { getStoredMarchas } from '@/lib/utils/cookies';
 
 export default function UltimoUtilizadorPage() {
   const [viaturas, setViaturas] = useState<Viatura[]>([]);
@@ -25,14 +26,21 @@ export default function UltimoUtilizadorPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const { data: vData } = await supabase.from('viaturas').select('*');
-        const vList = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
-        setViaturas(vList);
-        if (vList.length > 0) {
-          setSelectedViaturaId(vList[0].id);
+        if (isSupabaseConfigured()) {
+          const { data: vData } = await supabase.from('viaturas').select('*');
+          if (vData && vData.length > 0) {
+            setViaturas(vData);
+            setSelectedViaturaId(vData[0].id);
+            setLoading(false);
+            return;
+          }
         }
+        setViaturas(MOCK_VIATURAS);
+        if (MOCK_VIATURAS.length > 0) setSelectedViaturaId(MOCK_VIATURAS[0].id);
       } catch (err) {
         console.error(err);
+        setViaturas(MOCK_VIATURAS);
+        if (MOCK_VIATURAS.length > 0) setSelectedViaturaId(MOCK_VIATURAS[0].id);
       } finally {
         setLoading(false);
       }
@@ -45,17 +53,35 @@ export default function UltimoUtilizadorPage() {
       if (!selectedViaturaId) return;
 
       try {
-        const { data: mData } = await supabase
-          .from('registos_marcha')
-          .select('*')
-          .eq('viatura_id', selectedViaturaId)
-          .order('data_saida', { ascending: false })
-          .limit(1);
+        const storedMarchas = getStoredMarchas();
+        let remoteMarchas: any[] = [];
 
-        if (mData && mData.length > 0) {
-          setUltimoRegisto(mData[0]);
-          setNipDest(mData[0].nip_fim || mData[0].nip_inicio);
-          setEmailDest(`${mData[0].nip_fim || mData[0].nip_inicio}@emfa.gov.pt`);
+        if (isSupabaseConfigured()) {
+          try {
+            const { data: mData } = await supabase
+              .from('registos_marcha')
+              .select('*')
+              .eq('viatura_id', selectedViaturaId)
+              .order('data_saida', { ascending: false })
+              .limit(5);
+
+            if (mData && mData.length > 0) remoteMarchas = mData;
+          } catch (netErr) {
+            console.warn('Erro de rede ao carregar última marcha:', netErr);
+          }
+        }
+
+        // Merge local and remote marchas for this vehicle
+        const combined = [...storedMarchas, ...remoteMarchas, ...MOCK_MARCHAS]
+          .filter((m) => m && m.viatura_id === selectedViaturaId)
+          .sort((a, b) => new Date(b.data_saida || 0).getTime() - new Date(a.data_saida || 0).getTime());
+
+        if (combined.length > 0) {
+          const latest = combined[0];
+          setUltimoRegisto(latest);
+          const nip = latest.nip_fim || latest.nip_inicio;
+          setNipDest(nip);
+          setEmailDest(`${nip}@emfa.gov.pt`);
         } else {
           setUltimoRegisto(MOCK_MARCHAS[0]);
           setNipDest(MOCK_MARCHAS[0].nip_fim || MOCK_MARCHAS[0].nip_inicio);
@@ -156,20 +182,24 @@ export default function UltimoUtilizadorPage() {
 
         {/* Driver Card Info */}
         {vSel && ultimoRegisto && (
-          <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <div className="p-5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
               <div>
-                <span className="text-[10px] font-mono text-slate-500 uppercase">ÚLTIMO MILITAR CONDUTOR</span>
-                <h3 className="text-lg font-mono font-bold text-emerald-400">
-                  NIP: {ultimoRegisto.nip_fim || ultimoRegisto.nip_inicio}
+                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider block">ÚLTIMO MILITAR CONDUTOR DESTA VIATURA</span>
+                <h3 className="text-xl font-mono font-black text-emerald-400">
+                  {ultimoRegisto.trigrama_ou_condutor_fim || ultimoRegisto.trigrama_ou_condutor_inicio || 'Sargento OLV (Manuel Oliveira)'}
                 </h3>
+                <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-300 mt-1">
+                  <span>NIP: <strong className="text-white font-bold">{ultimoRegisto.nip_fim || ultimoRegisto.nip_inicio}</strong></span>
+                  <span className="text-emerald-300 font-semibold">• Destino/Missão: <strong className="text-emerald-200">{ultimoRegisto.destino_funcao || 'Serviço Geral / Apoio Tático'}</strong></span>
+                </div>
               </div>
               <span
-                className={`px-3 py-1 rounded-full text-xs font-bold font-mono ${
-                  vSel.necessita_limpeza ? 'bg-amber-950 text-amber-300 border border-amber-500/40' : 'bg-slate-800 text-slate-300'
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono ${
+                  vSel.necessita_limpeza ? 'bg-amber-950 text-amber-300 border border-amber-500/40' : 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
                 }`}
               >
-                {vSel.necessita_limpeza ? '⚠️ LIMPEZA PENDENTE' : 'LIMPEZA EM DIA'}
+                {vSel.necessita_limpeza ? '⚠️ LIMPEZA PENDENTE' : '✓ LIMPEZA EM DIA'}
               </span>
             </div>
 
