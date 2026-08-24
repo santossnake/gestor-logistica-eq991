@@ -295,6 +295,30 @@ export function saveStoredEmprestimos(emprestimos: any[]): void {
 }
 
 // ==========================================
+// LOCAL PERSISTENCE FOR REGISTOS DE MARCHA
+// ==========================================
+const MARCHAS_STORAGE_KEY = 'eq991_marchas_db_v1';
+
+export function getStoredMarchas(): any[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(MARCHAS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export function saveStoredMarchas(marchas: any[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(MARCHAS_STORAGE_KEY, JSON.stringify(marchas));
+  } catch (err) {
+    console.error('Erro ao guardar marchas localmente:', err);
+  }
+}
+
+// ==========================================
 // AUDIT LOG PERSISTENCE & SYSTEM LOGGING
 // ==========================================
 export interface AuditLogItem {

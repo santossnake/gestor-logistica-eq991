@@ -5,6 +5,8 @@ import { Route, Car, User, MapPin, Calendar, Search, Filter, Download, ArrowUpRi
 import { supabase, isSupabaseConfigured, Viatura, RegistoMarcha } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_MARCHAS } from '@/lib/mock-data';
 
+import { getStoredMarchas } from '@/lib/utils/cookies';
+
 export default function MovimentosViaturasPage() {
   const [marchas, setMarchas] = useState<RegistoMarcha[]>([]);
   const [viaturas, setViaturas] = useState<Viatura[]>([]);
@@ -19,23 +21,38 @@ export default function MovimentosViaturasPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        if (isSupabaseConfigured()) {
-          const { data: vData } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
-          if (vData && vData.length > 0) setViaturas(vData);
+        const storedMarchas = getStoredMarchas();
+        let remoteMarchas: any[] = [];
+        let remoteViaturas: any[] = [];
 
-          const { data: mData } = await supabase.from('registos_marcha').select('*').order('data_saida', { ascending: false });
-          if (mData && mData.length > 0) {
-            setMarchas(mData);
-            setLoading(false);
-            return;
+        if (isSupabaseConfigured()) {
+          try {
+            const { data: vData } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
+            if (vData && vData.length > 0) remoteViaturas = vData;
+
+            const { data: mData } = await supabase.from('registos_marcha').select('*').order('data_saida', { ascending: false });
+            if (mData && mData.length > 0) remoteMarchas = mData;
+          } catch (netErr: any) {
+            console.warn('Erro de rede ao carregar movimentos do Supabase:', netErr);
           }
         }
-        setViaturas(MOCK_VIATURAS);
-        setMarchas(MOCK_MARCHAS);
+
+        const combinedViaturas = remoteViaturas.length > 0 ? remoteViaturas : MOCK_VIATURAS;
+        setViaturas(combinedViaturas);
+
+        // Merge remote and local marchas without duplicates
+        const map = new Map<string, any>();
+        [...storedMarchas, ...remoteMarchas, ...MOCK_MARCHAS].forEach((m) => {
+          if (m && m.id) map.set(m.id, m);
+        });
+
+        const mergedMarchas = Array.from(map.values()).sort((a, b) => {
+          return new Date(b.data_saida || 0).getTime() - new Date(a.data_saida || 0).getTime();
+        });
+
+        setMarchas(mergedMarchas);
       } catch (err) {
-        console.warn('Erro ao carregar movimentos do Supabase:', err);
-        setViaturas(MOCK_VIATURAS);
-        setMarchas(MOCK_MARCHAS);
+        console.warn('Erro ao carregar movimentos:', err);
       } finally {
         setLoading(false);
       }

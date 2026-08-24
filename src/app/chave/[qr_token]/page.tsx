@@ -28,8 +28,8 @@ import {
   Building2,
   LocateFixed
 } from 'lucide-react';
-import { getStoredMilitaryProfile, saveMilitaryProfile, saveFleetOverride, getFleetOverrides, getStoredLocais, MilitaryProfile } from '@/lib/utils/cookies';
-import { supabase, Viatura, LocalItem, RegistoMarcha } from '@/lib/supabase/client';
+import { getStoredMilitaryProfile, saveMilitaryProfile, saveFleetOverride, getFleetOverrides, getStoredLocais, getStoredMarchas, saveStoredMarchas, MilitaryProfile } from '@/lib/utils/cookies';
+import { supabase, isSupabaseConfigured, Viatura, LocalItem, RegistoMarcha } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_LOCAIS, MOCK_MARCHAS } from '@/lib/mock-data';
 import { LiveGpsTracker } from '@/components/LiveGpsTracker';
 
@@ -292,16 +292,50 @@ export default function ChavePage() {
         data_saida: new Date().toISOString()
       };
 
-      const { data } = await supabase.from('registos_marcha').insert([newMarcha]).select();
-      const marchaRec = data && data.length > 0 ? data[0] : { id: `mar-${Date.now()}`, ...newMarcha };
+      let marchaRec: any = null;
+
+      if (isSupabaseConfigured()) {
+        try {
+          let { data, error } = await supabase.from('registos_marcha').insert([newMarcha]).select();
+
+          // Fallback if Supabase DB table has not run the column migration script yet
+          if (error && (error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
+            console.warn('Aviso: Colunas de condutor/destino em falta no Supabase, a guardar payload base:', error.message);
+            const { trigrama_ou_condutor_inicio, destino_funcao, ...cleanPayload } = newMarcha;
+            const retry = await supabase.from('registos_marcha').insert([cleanPayload]).select();
+            data = retry.data;
+          }
+
+          if (data && data.length > 0) {
+            marchaRec = data[0];
+          }
+        } catch (netErr: any) {
+          console.warn('Erro de rede ao registar marcha no Supabase:', netErr);
+        }
+      }
+
+      marchaRec = marchaRec || { id: `mar-${Date.now()}`, ...newMarcha };
       setMarchaAtiva(marchaRec);
 
-      await supabase.from('viaturas').update({ estado: 'EM_USO', km_atuais: kmInicialInput }).eq('id', viatura.id);
+      // Always save to local storage mirror
+      const currentMarchas = getStoredMarchas();
+      saveStoredMarchas([marchaRec, ...currentMarchas.filter((m: any) => m.id !== marchaRec.id)]);
+
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('viaturas').update({ estado: 'EM_USO', km_atuais: kmInicialInput }).eq('id', viatura.id);
+        } catch (netErr: any) {
+          console.warn('Erro de rede ao atualizar estado da viatura no Supabase:', netErr);
+        }
+      }
+
+      saveFleetOverride(viatura.id, { estado: 'EM_USO', km_atuais: kmInicialInput });
 
       setViatura({ ...viatura, estado: 'EM_USO', km_atuais: kmInicialInput });
       setIsGpsTrackingActive(true);
       setActiveTab('FINALIZAR');
     } catch (err: any) {
+      console.error(err);
       setErrorMsg(err.message || 'Erro ao iniciar marcha.');
     }
   };
@@ -315,17 +349,23 @@ export default function ChavePage() {
     saveMilitaryProfile(profile);
 
     try {
-      await supabase.from('historico_posicoes_gps').insert([
-        {
-          viatura_id: viatura?.id,
-          registo_marcha_id: marchaAtiva.id,
-          nip_operador: profile.nip,
-          latitude: viatura?.latitude_atual || 39.094,
-          longitude: viatura?.longitude_atual || -8.967,
-          tipo_evento: 'PING_PERCURSO',
-          registado_at: new Date().toISOString()
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('historico_posicoes_gps').insert([
+            {
+              viatura_id: viatura?.id,
+              registo_marcha_id: marchaAtiva.id,
+              nip_operador: profile.nip,
+              latitude: viatura?.latitude_atual || 39.094,
+              longitude: viatura?.longitude_atual || -8.967,
+              tipo_evento: 'PING_PERCURSO',
+              registado_at: new Date().toISOString()
+            }
+          ]);
+        } catch (netErr: any) {
+          console.warn('Erro de rede ao registar posição GPS no Supabase:', netErr);
         }
-      ]);
+      }
 
       alert(`Condutor alterado com sucesso para ${profile.trigramaOuCondutor} (NIP: ${profile.nip}). O rastreio GPS continuará ativado.`);
     } catch (err) {
@@ -353,27 +393,41 @@ export default function ChavePage() {
 
     try {
       if (marchaAtiva) {
-        await supabase
-          .from('registos_marcha')
-          .update({
-            nip_fim: profile.nip,
-            trigrama_ou_condutor_fim: profile.trigramaOuCondutor,
-            km_final: kmFinalInput,
-            nivel_combustivel: nivelCombustivel,
-            litros_abastecidos: abasteceu ? litros : 0,
-            valor_abastecido: abasteceu ? valorEuros : 0,
-            localizacao_chave: finalKeyLoc,
-            localizacao_viatura: finalVtrLoc,
-            checklist_documentos: checkDocs,
-            checklist_cartao: checkCartao,
-            checklist_seguranca: checkSeguranca,
-            necessita_limpeza: necessitaLimpeza,
-            data_chegada: new Date().toISOString()
-          })
-          .eq('id', marchaAtiva.id);
+        const updatePayload = {
+          nip_fim: profile.nip,
+          trigrama_ou_condutor_fim: profile.trigramaOuCondutor,
+          km_final: kmFinalInput,
+          nivel_combustivel: nivelCombustivel,
+          litros_abastecidos: abasteceu ? litros : 0,
+          valor_abastecido: abasteceu ? valorEuros : 0,
+          localizacao_chave: finalKeyLoc,
+          localizacao_viatura: finalVtrLoc,
+          checklist_documentos: checkDocs,
+          checklist_cartao: checkCartao,
+          checklist_seguranca: checkSeguranca,
+          necessita_limpeza: necessitaLimpeza,
+          data_chegada: new Date().toISOString()
+        };
+
+        if (isSupabaseConfigured()) {
+          try {
+            let { error } = await supabase.from('registos_marcha').update(updatePayload).eq('id', marchaAtiva.id);
+            if (error && (error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
+              const { trigrama_ou_condutor_fim, ...cleanUpdate } = updatePayload;
+              await supabase.from('registos_marcha').update(cleanUpdate).eq('id', marchaAtiva.id);
+            }
+          } catch (netErr: any) {
+            console.warn('Erro de rede ao finalizar marcha no Supabase:', netErr);
+          }
+        }
+
+        // Save local marchas update
+        const currentMarchas = getStoredMarchas();
+        const updatedMarchaObj = { ...marchaAtiva, ...updatePayload };
+        saveStoredMarchas([updatedMarchaObj, ...currentMarchas.filter((m: any) => m.id !== marchaAtiva.id)]);
       }
 
-      // 2. Save local override so state persists across page refreshes
+      // Save local override so state persists across page refreshes
       saveFleetOverride(viatura.id, {
         estado: 'DISPONIVEL',
         km_atuais: kmFinalInput,
@@ -382,17 +436,22 @@ export default function ChavePage() {
         necessita_limpeza: necessitaLimpeza
       });
 
-      // 3. Update Vehicle State to DISPONIVEL in Supabase
-      await supabase
-        .from('viaturas')
-        .update({
-          estado: 'DISPONIVEL',
-          km_atuais: kmFinalInput,
-          localizacao_atual_viatura: finalVtrLoc,
-          localizacao_atual_chave: finalKeyLoc,
-          necessita_limpeza: necessitaLimpeza
-        })
-        .eq('id', viatura.id);
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase
+            .from('viaturas')
+            .update({
+              estado: 'DISPONIVEL',
+              km_atuais: kmFinalInput,
+              localizacao_atual_viatura: finalVtrLoc,
+              localizacao_atual_chave: finalKeyLoc,
+              necessita_limpeza: necessitaLimpeza
+            })
+            .eq('id', viatura.id);
+        } catch (netErr: any) {
+          console.warn('Erro de rede ao atualizar viatura no Supabase:', netErr);
+        }
+      }
 
       setViatura({
         ...viatura,
