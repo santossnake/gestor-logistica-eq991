@@ -84,6 +84,9 @@ export interface RegistoMarcha {
   viatura_id: string;
   nip_inicio: string;
   nip_fim?: string;
+  trigrama_ou_condutor_inicio?: string;
+  trigrama_ou_condutor_fim?: string;
+  destino_funcao?: string;
   km_inicial: number;
   km_final?: number;
   nivel_combustivel?: 'RESERVA' | '1/4' | '1/2' | '3/4' | 'CHEIO';

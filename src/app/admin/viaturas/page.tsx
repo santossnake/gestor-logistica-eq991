@@ -25,8 +25,8 @@ import {
   Wrench,
   RotateCcw
 } from 'lucide-react';
-import { supabase, isSupabaseConfigured, Viatura, HistoricoGps, RegistoAbastecimento } from '@/lib/supabase/client';
-import { MOCK_VIATURAS, MOCK_GPS, MOCK_LOCAIS } from '@/lib/mock-data';
+import { supabase, isSupabaseConfigured, Viatura, HistoricoGps, RegistoAbastecimento, RegistoMarcha } from '@/lib/supabase/client';
+import { MOCK_VIATURAS, MOCK_GPS, MOCK_LOCAIS, MOCK_MARCHAS } from '@/lib/mock-data';
 import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride, getStoredLocais, saveStoredLocais, logAuditAction } from '@/lib/utils/cookies';
 
 const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false });
@@ -132,6 +132,8 @@ export default function AdminViaturasPage() {
     };
   };
 
+  const [marchas, setMarchas] = useState<RegistoMarcha[]>([]);
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -144,6 +146,13 @@ export default function AdminViaturasPage() {
         if (vData && vData.length > 0) {
           const sanitized = vData.map((v) => sanitizeViaturaKm(v));
           setViaturas(sanitized);
+        }
+
+        const { data: mData } = await supabase.from('registos_marcha').select('*').order('data_saida', { ascending: false });
+        if (mData && mData.length > 0) {
+          setMarchas(mData);
+        } else {
+          setMarchas(MOCK_MARCHAS);
         }
 
         const { data: gData } = await supabase.from('historico_posicoes_gps').select('*').order('registado_at', { ascending: false });
@@ -672,6 +681,36 @@ export default function AdminViaturasPage() {
                     {v.estado}
                   </span>
                 </div>
+
+                {/* ACTIVE MARCH / DRIVER & MISSION BANNER */}
+                {v.estado === 'EM_USO' && (() => {
+                  const activeMarcha = marchas.find((m) => m.viatura_id === v.id && !m.data_chegada) || marchas.find((m) => m.viatura_id === v.id);
+                  return (
+                    <div className="p-3 rounded-xl bg-blue-950/90 border border-blue-500/60 text-blue-200 text-xs font-mono space-y-1 shadow-md">
+                      <div className="flex items-center justify-between font-bold text-blue-300 border-b border-blue-800/80 pb-1">
+                        <span className="flex items-center space-x-1">
+                          <Car className="w-3.5 h-3.5 text-blue-400" />
+                          <span>🚗 EM SERVIÇO / CONDUTOR ATUAL</span>
+                        </span>
+                        <span className="text-[10px] text-blue-400 font-normal">
+                          {activeMarcha?.data_saida ? new Date(activeMarcha.data_saida).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Condutor:</span>
+                        <span className="font-bold text-white">{activeMarcha?.trigrama_ou_condutor_inicio || activeMarcha?.nip_inicio || 'N/D'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">NIP:</span>
+                        <span className="text-slate-300">{activeMarcha?.nip_inicio || 'N/D'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Destino / Função:</span>
+                        <span className="font-bold text-emerald-300 truncate max-w-[150px]">{activeMarcha?.destino_funcao || 'Serviço Geral'}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* CLEANING WARNING BADGE */}
                 {v.necessita_limpeza ? (

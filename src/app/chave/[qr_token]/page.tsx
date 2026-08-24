@@ -451,6 +451,36 @@ export default function ChavePage() {
             <span>🧼 ATENÇÃO: Esta viatura necessita de limpeza interna/externa registada pelo condutor anterior.</span>
           </div>
         )}
+
+        {/* Active Marcha Driver & Destination Card */}
+        {(viatura.estado === 'EM_USO' || marchaAtiva) && (
+          <div className="p-3.5 rounded-xl bg-blue-950/90 border border-blue-500/60 text-blue-200 text-xs font-mono space-y-2 shadow-lg animate-in fade-in">
+            <div className="flex items-center justify-between font-bold text-blue-300 border-b border-blue-800/80 pb-1.5">
+              <span className="flex items-center space-x-1.5 uppercase tracking-wider">
+                <Car className="w-4 h-4 text-blue-400" />
+                <span>🚗 MARCHA ATIVA / CONDUTOR EM SERVIÇO</span>
+              </span>
+              <span className="text-[10px] text-blue-400 font-normal">
+                {marchaAtiva?.data_saida ? new Date(marchaAtiva.data_saida).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-slate-400 text-[10px] block font-mono uppercase">Condutor / Trigrama / Posto Nome</span>
+                <span className="font-bold text-white text-sm block">
+                  {marchaAtiva?.trigrama_ou_condutor_inicio || profile.trigramaOuCondutor || profile.nip || 'N/D'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-mono">NIP: {marchaAtiva?.nip_inicio || profile.nip}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[10px] block font-mono uppercase">Destino / Função da Missão</span>
+                <span className="font-bold text-emerald-300 text-sm block">
+                  {marchaAtiva?.destino_funcao || profile.destinoFuncao || 'Serviço Geral'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* QUICK ACTIONS BAR: REFUEL + REPORT ISSUE */}

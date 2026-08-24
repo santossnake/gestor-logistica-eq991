@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Key, MapPin, UserCheck, Map, AlertTriangle, FileText, QrCode, Building, Car, Calendar, ShieldCheck, LogOut } from 'lucide-react';
+import { LayoutDashboard, Key, MapPin, UserCheck, Map, AlertTriangle, FileText, QrCode, Building, Car, Calendar, ShieldCheck, LogOut, Route } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -40,6 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Gestão de Reservas', href: '/admin/reservas', icon: Calendar },
     { name: 'Utilizadores Logística (Trigramas)', href: '/admin/utilizadores', icon: UserCheck },
     { name: 'Gestão de Frota', href: '/admin/viaturas', icon: Car },
+    { name: 'Movimentos & Marchas', href: '/admin/movimentos', icon: Route },
     { name: 'Cedências Externas', href: '/admin/emprestimos', icon: Building },
     { name: 'Mapa de Percursos', href: '/admin/mapa', icon: Map },
     { name: 'Último Utilizador', href: '/admin/ultimo-utilizador', icon: UserCheck },
