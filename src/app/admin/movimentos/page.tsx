@@ -1,16 +1,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Route, Car, User, MapPin, Calendar, Search, Filter, Download, ArrowUpRight, CheckCircle2, Clock, Navigation } from 'lucide-react';
-import { supabase, isSupabaseConfigured, Viatura, RegistoMarcha } from '@/lib/supabase/client';
-import { MOCK_VIATURAS, MOCK_MARCHAS } from '@/lib/mock-data';
-
+import dynamic from 'next/dynamic';
+import { Route, Car, User, MapPin, Calendar, Search, Filter, Download, ArrowUpRight, CheckCircle2, Clock, Navigation, Eye, X } from 'lucide-react';
+import { supabase, isSupabaseConfigured, Viatura, RegistoMarcha, HistoricoGps } from '@/lib/supabase/client';
+import { MOCK_VIATURAS, MOCK_MARCHAS, MOCK_GPS } from '@/lib/mock-data';
 import { getStoredMarchas } from '@/lib/utils/cookies';
+
+const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false });
 
 export default function MovimentosViaturasPage() {
   const [marchas, setMarchas] = useState<RegistoMarcha[]>([]);
   const [viaturas, setViaturas] = useState<Viatura[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Modal Map state
+  const [selectedMarchaForMap, setSelectedMarchaForMap] = useState<RegistoMarcha | null>(null);
+  const [marchaGpsPoints, setMarchaGpsPoints] = useState<HistoricoGps[]>([]);
 
   // Filters
   const [selectedViaturaId, setSelectedViaturaId] = useState<string>('TODAS');
@@ -59,6 +65,73 @@ export default function MovimentosViaturasPage() {
     }
     loadData();
   }, []);
+
+  const handleOpenMapModal = async (m: RegistoMarcha) => {
+    setSelectedMarchaForMap(m);
+
+    try {
+      if (isSupabaseConfigured()) {
+        const { data: gData } = await supabase
+          .from('historico_posicoes_gps')
+          .select('*')
+          .eq('registo_marcha_id', m.id)
+          .order('registado_at', { ascending: true });
+
+        if (gData && gData.length > 0) {
+          setMarchaGpsPoints(gData);
+          return;
+        }
+      }
+
+      // Filter MOCK_GPS points or generate realistic route points for this march
+      const points = MOCK_GPS.filter((g) => g.viatura_id === m.viatura_id || g.registo_marcha_id === m.id);
+      if (points.length > 0) {
+        setMarchaGpsPoints(points);
+      } else {
+        // Fallback synthetic route points between Ota base [39.092, -8.968] and Sintra / Lisbon
+        const startLat = m.latitude_inicio || 39.092;
+        const startLng = m.longitude_inicio || -8.968;
+        const endLat = m.latitude_fecho || startLat + 0.015;
+        const endLng = m.longitude_fecho || startLng - 0.025;
+
+        const synth: HistoricoGps[] = [
+          {
+            id: `p1-${m.id}`,
+            viatura_id: m.viatura_id,
+            registo_marcha_id: m.id,
+            nip_operador: m.nip_inicio,
+            latitude: startLat,
+            longitude: startLng,
+            tipo_evento: 'INICIO_MARCHA',
+            registado_at: m.data_saida || new Date().toISOString()
+          },
+          {
+            id: `p2-${m.id}`,
+            viatura_id: m.viatura_id,
+            registo_marcha_id: m.id,
+            nip_operador: m.nip_inicio,
+            latitude: (startLat + endLat) / 2,
+            longitude: (startLng + endLng) / 2,
+            tipo_evento: 'PING_PERCURSO',
+            registado_at: m.data_saida || new Date().toISOString()
+          },
+          {
+            id: `p3-${m.id}`,
+            viatura_id: m.viatura_id,
+            registo_marcha_id: m.id,
+            nip_operador: m.nip_fim || m.nip_inicio,
+            latitude: endLat,
+            longitude: endLng,
+            tipo_evento: m.data_chegada ? 'FIM_MARCHA' : 'PING_PERCURSO',
+            registado_at: m.data_chegada || new Date().toISOString()
+          }
+        ];
+        setMarchaGpsPoints(synth);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar posições GPS:', err);
+    }
+  };
 
   // Map viatura_id to Viatura object
   const getViaturaInfo = (viaturaId: string) => {
@@ -342,23 +415,34 @@ export default function MovimentosViaturasPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-4 text-xs font-mono">
-                      <div>
-                        <span className="text-slate-500 block text-[10px]">ODÓMETRO INICIAL</span>
-                        <span className="text-slate-200 font-bold">{m.km_inicial?.toLocaleString()} KM</span>
-                      </div>
-                      {m.km_final && (
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-4 text-xs font-mono">
                         <div>
-                          <span className="text-slate-500 block text-[10px]">ODÓMETRO FINAL</span>
-                          <span className="text-emerald-400 font-bold">{m.km_final?.toLocaleString()} KM</span>
+                          <span className="text-slate-500 block text-[10px]">ODÓMETRO INICIAL</span>
+                          <span className="text-slate-200 font-bold">{m.km_inicial?.toLocaleString()} KM</span>
                         </div>
-                      )}
-                      {m.km_final && (
-                        <div className="bg-slate-950 px-2.5 py-1 rounded border border-slate-800 text-right">
-                          <span className="text-slate-500 block text-[10px]">DISTÂNCIA</span>
-                          <span className="text-amber-400 font-bold">+{kmPercorridos} KM</span>
-                        </div>
-                      )}
+                        {m.km_final && (
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">ODÓMETRO FINAL</span>
+                            <span className="text-emerald-400 font-bold">{m.km_final?.toLocaleString()} KM</span>
+                          </div>
+                        )}
+                        {m.km_final && (
+                          <div className="bg-slate-950 px-2.5 py-1 rounded border border-slate-800 text-right">
+                            <span className="text-slate-500 block text-[10px]">DISTÂNCIA</span>
+                            <span className="text-amber-400 font-bold">+{kmPercorridos} KM</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => handleOpenMapModal(m)}
+                        className="px-3 py-2 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center space-x-1.5 transition-colors shadow-md"
+                        title="Ver percurso GPS completo em Imagem de Satélite"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Ver Percurso 🛰️</span>
+                      </button>
                     </div>
                   </div>
 
@@ -414,6 +498,76 @@ export default function MovimentosViaturasPage() {
           </div>
         )}
       </div>
+
+      {/* SATELLITE GPS ROUTE MAP MODAL */}
+      {selectedMarchaForMap && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl space-y-4 p-5 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <Route className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-mono font-black text-lg text-white">
+                    Percurso em Satélite - {getViaturaInfo(selectedMarchaForMap.viatura_id).matricula}
+                  </h3>
+                  <p className="text-xs text-emerald-400 font-semibold">
+                    Destino / Missão: {selectedMarchaForMap.destino_funcao || 'Serviço Geral'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedMarchaForMap(null)}
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* March Quick Stats Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div>
+                <span className="text-slate-500 block text-[10px]">CONDUTOR</span>
+                <span className="text-slate-100 font-bold">
+                  {selectedMarchaForMap.trigrama_ou_condutor_inicio || selectedMarchaForMap.nip_inicio}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px]">NIP</span>
+                <span className="text-slate-300 font-bold">{selectedMarchaForMap.nip_inicio}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px]">KM INICIAL / FINAL</span>
+                <span className="text-amber-400 font-bold">
+                  {selectedMarchaForMap.km_inicial} KM {selectedMarchaForMap.km_final ? `➔ ${selectedMarchaForMap.km_final} KM` : '(Em curso)'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px]">IMAGEM DE MAPA</span>
+                <span className="text-emerald-400 font-bold flex items-center space-x-1">
+                  <span>🛰️ Satélite HD</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Interactive Route Map Container */}
+            <div className="rounded-xl overflow-hidden border border-slate-800">
+              <RouteMap pontosGps={marchaGpsPoints} />
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setSelectedMarchaForMap(null)}
+                className="px-5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors"
+              >
+                Fechar Mapa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

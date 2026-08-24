@@ -9,6 +9,7 @@ interface RouteMapProps {
 
 export default function RouteMap({ pontosGps }: RouteMapProps) {
   const [mounted, setMounted] = useState<boolean>(false);
+  const [mapType, setMapType] = useState<'SATELLITE' | 'STREET'>('SATELLITE');
 
   useEffect(() => {
     setMounted(true);
@@ -54,6 +55,32 @@ export default function RouteMap({ pontosGps }: RouteMapProps) {
 
   return (
     <div className="w-full h-[450px] rounded-xl overflow-hidden border border-slate-800 shadow-2xl relative">
+      {/* Map Layer Controls Switcher Overlay */}
+      <div className="absolute top-3 right-3 z-[1000] bg-slate-950/90 backdrop-blur p-1 rounded-lg border border-slate-700 flex items-center space-x-1 font-mono text-[11px] font-bold shadow-xl">
+        <button
+          type="button"
+          onClick={() => setMapType('SATELLITE')}
+          className={`px-2.5 py-1 rounded transition-all ${
+            mapType === 'SATELLITE'
+              ? 'bg-emerald-600 text-white shadow'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          🛰️ Satélite
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapType('STREET')}
+          className={`px-2.5 py-1 rounded transition-all ${
+            mapType === 'STREET'
+              ? 'bg-emerald-600 text-white shadow'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          🗺️ Roteiro
+        </button>
+      </div>
+
       {/* @ts-ignore */}
       <MapContainer
         center={centerPos}
@@ -61,10 +88,18 @@ export default function RouteMap({ pontosGps }: RouteMapProps) {
         scrollWheelZoom={true}
         className="w-full h-full"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        {mapType === 'SATELLITE' ? (
+          <TileLayer
+            attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and GIS User Community'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+          />
+        ) : (
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        )}
 
         {/* Route line */}
         <Polyline positions={positions} color="#10b981" weight={4} opacity={0.8} dashArray="5, 10" />
