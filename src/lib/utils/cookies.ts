@@ -5,6 +5,8 @@ export interface MilitaryProfile {
   nome: string;
   posto: string;
   email: string;
+  trigramaOuCondutor?: string;
+  destinoFuncao?: string;
 }
 
 export const POSTOS_FORCA_AEREA = [
@@ -36,7 +38,7 @@ const MILITARY_PROFILE_COOKIE_KEY = 'eq991_military_profile';
 
 export const getStoredMilitaryProfile = (): MilitaryProfile => {
   if (typeof window === 'undefined') {
-    return { nip: '', nome: '', posto: '', email: '' };
+    return { nip: '', nome: '', posto: '', email: '', trigramaOuCondutor: '', destinoFuncao: '' };
   }
 
   try {
@@ -53,7 +55,7 @@ export const getStoredMilitaryProfile = (): MilitaryProfile => {
     console.error('Erro ao ler perfil do militar:', err);
   }
 
-  return { nip: '', nome: '', posto: '', email: '' };
+  return { nip: '', nome: '', posto: '', email: '', trigramaOuCondutor: '', destinoFuncao: '' };
 };
 
 // Local Pedidos Persistence

@@ -32,7 +32,6 @@ import { getStoredMilitaryProfile, saveMilitaryProfile, saveFleetOverride, getFl
 import { supabase, Viatura, LocalItem, RegistoMarcha } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_LOCAIS, MOCK_MARCHAS } from '@/lib/mock-data';
 import { LiveGpsTracker } from '@/components/LiveGpsTracker';
-import { OdometerScanner } from '@/components/OdometerScanner';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
@@ -275,8 +274,8 @@ export default function ChavePage() {
 
   // Handler: Iniciar Marcha
   const handleIniciarMarcha = async () => {
-    if (!viatura || !profile.nip) {
-      setErrorMsg('Por favor introduza o seu NIP.');
+    if (!viatura || !profile.nip || !profile.trigramaOuCondutor || !profile.destinoFuncao) {
+      setErrorMsg('Por favor preencha todos os campos obrigatórios (NIP, Trigrama ou Posto e Nome, Destino / Função).');
       return;
     }
 
@@ -287,6 +286,8 @@ export default function ChavePage() {
       const newMarcha = {
         viatura_id: viatura.id,
         nip_inicio: profile.nip,
+        trigrama_ou_condutor_inicio: profile.trigramaOuCondutor,
+        destino_funcao: profile.destinoFuncao,
         km_inicial: kmInicialInput,
         data_saida: new Date().toISOString()
       };
@@ -307,7 +308,10 @@ export default function ChavePage() {
 
   // Handler: Alternar Condutor
   const handleAlternarCondutor = async () => {
-    if (!profile.nip || !marchaAtiva) return;
+    if (!profile.nip || !profile.trigramaOuCondutor || !marchaAtiva) {
+      setErrorMsg('Por favor preencha o NIP e Trigrama/Posto e Nome do novo condutor.');
+      return;
+    }
     saveMilitaryProfile(profile);
 
     try {
@@ -323,7 +327,7 @@ export default function ChavePage() {
         }
       ]);
 
-      alert(`Condutor alterado com sucesso para o NIP ${profile.nip}. O rastreio GPS continuará no seu dispositivo.`);
+      alert(`Condutor alterado com sucesso para ${profile.trigramaOuCondutor} (NIP: ${profile.nip}). O rastreio GPS continuará ativado.`);
     } catch (err) {
       console.error(err);
     }
@@ -331,8 +335,8 @@ export default function ChavePage() {
 
   // Handler: Finalizar Marcha
   const handleFinalizarMarcha = async () => {
-    if (!viatura || !profile.nip) {
-      setErrorMsg('Por favor indique o NIP de quem entrega a chave.');
+    if (!viatura || !profile.nip || !profile.trigramaOuCondutor) {
+      setErrorMsg('Por favor indique o NIP e Trigrama ou Posto e Nome de quem entrega a chave.');
       return;
     }
 
@@ -353,6 +357,7 @@ export default function ChavePage() {
           .from('registos_marcha')
           .update({
             nip_fim: profile.nip,
+            trigrama_ou_condutor_fim: profile.trigramaOuCondutor,
             km_final: kmFinalInput,
             nivel_combustivel: nivelCombustivel,
             litros_abastecidos: abasteceu ? litros : 0,
@@ -555,25 +560,51 @@ export default function ChavePage() {
         <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-4">
           <h2 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center space-x-2">
             <Play className="w-4 h-4" />
-            <span>Registo de Início de Marcha</span>
+            <span>Registo de Início de Marcha (Levantamento)</span>
           </h2>
 
           <div className="space-y-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">NIP do Condutor *</label>
+                <input
+                  type="text"
+                  required
+                  value={profile.nip}
+                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  placeholder="Ex: 134890-A"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Trigrama ou Posto e Nome *</label>
+                <input
+                  type="text"
+                  required
+                  value={profile.trigramaOuCondutor || ''}
+                  onChange={(e) => setProfile({ ...profile, trigramaOuCondutor: e.target.value })}
+                  placeholder="Ex: OLV ou Tenente Oliveira"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-slate-400 mb-1">NIP do Condutor *</label>
+              <label className="block text-slate-400 mb-1 font-semibold">Destino / Função da Missão *</label>
               <input
                 type="text"
                 required
-                value={profile.nip}
-                onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-                placeholder="Ex: 134890-A"
+                value={profile.destinoFuncao || ''}
+                onChange={(e) => setProfile({ ...profile, destinoFuncao: e.target.value })}
+                placeholder="Ex: BA1 Sintra / Apoio Tático"
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-slate-400 mb-1">Quilómetros Iniciais do Odómetro *</label>
+              <label className="block text-slate-400 mb-1 font-semibold">Quilómetros Iniciais do Odómetro *</label>
               <input
                 type="number"
                 required
@@ -582,12 +613,6 @@ export default function ChavePage() {
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono text-emerald-400 font-bold"
               />
             </div>
-
-            <OdometerScanner
-              onKmDetected={(km) => {
-                if (km > 0) setKmInicialInput(km);
-              }}
-            />
           </div>
 
           <button
@@ -605,19 +630,45 @@ export default function ChavePage() {
         <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-4">
           <h2 className="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center space-x-2">
             <RefreshCcw className="w-4 h-4" />
-            <span>Alternar Condutor a Meio do Serviço</span>
+            <span>Alternar Condutor em Serviço</span>
           </h2>
 
           <div className="space-y-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">NIP do Novo Condutor *</label>
+                <input
+                  type="text"
+                  required
+                  value={profile.nip}
+                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  placeholder="Ex: 128912-B"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Trigrama ou Posto e Nome do Novo Condutor *</label>
+                <input
+                  type="text"
+                  required
+                  value={profile.trigramaOuCondutor || ''}
+                  onChange={(e) => setProfile({ ...profile, trigramaOuCondutor: e.target.value })}
+                  placeholder="Ex: FER ou Sargento Ferreira"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-slate-400 mb-1">NIP do Novo Condutor *</label>
+              <label className="block text-slate-400 mb-1 font-semibold">Novo Destino / Função *</label>
               <input
                 type="text"
                 required
-                value={profile.nip}
-                onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-                placeholder="Ex: 128912-B"
+                value={profile.destinoFuncao || ''}
+                onChange={(e) => setProfile({ ...profile, destinoFuncao: e.target.value })}
+                placeholder="Ex: Retorno a Ota / Apoio Logístico"
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
               />
             </div>
@@ -638,25 +689,51 @@ export default function ChavePage() {
         <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-5">
           <h2 className="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-2">
             <Square className="w-4 h-4 fill-amber-400" />
-            <span>Registo de Devolução & Fecho de Marcha</span>
+            <span>Registo de Devolução & Fecho de Marcha (Entrega)</span>
           </h2>
 
           <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">NIP de quem entrega a chave *</label>
+                <input
+                  type="text"
+                  required
+                  value={profile.nip}
+                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  placeholder="Ex: 134890-A"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Trigrama ou Posto e Nome *</label>
+                <input
+                  type="text"
+                  required
+                  value={profile.trigramaOuCondutor || ''}
+                  onChange={(e) => setProfile({ ...profile, trigramaOuCondutor: e.target.value })}
+                  placeholder="Ex: OLV ou Tenente Oliveira"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-slate-400 mb-1">NIP de quem entrega a chave *</label>
+              <label className="block text-slate-400 mb-1 font-semibold">Destino / Função Concluída *</label>
               <input
                 type="text"
                 required
-                value={profile.nip}
-                onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-                placeholder="Ex: 134890-A"
+                value={profile.destinoFuncao || ''}
+                onChange={(e) => setProfile({ ...profile, destinoFuncao: e.target.value })}
+                placeholder="Ex: Missão BA1 Sintra Concluída"
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-slate-400 mb-1">Quilómetros Finais do Odómetro *</label>
+              <label className="block text-slate-400 mb-1 font-semibold">Quilómetros Finais do Odómetro *</label>
               <input
                 type="number"
                 required
@@ -665,12 +742,6 @@ export default function ChavePage() {
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono text-amber-400 font-bold"
               />
             </div>
-
-            <OdometerScanner
-              onKmDetected={(km) => {
-                if (km > 0) setKmFinalInput(km);
-              }}
-            />
 
             <div>
               <label className="block text-slate-400 mb-1">Nível de Combustível *</label>
