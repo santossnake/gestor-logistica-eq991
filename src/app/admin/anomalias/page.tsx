@@ -16,7 +16,7 @@ export default function AnomaliasPage() {
     async function loadData() {
       try {
         const { data: aData } = await supabase.from('anomalias').select('*').order('created_at', { ascending: false });
-        const { data: vData } = await supabase.from('anomalias').select('*');
+        const { data: vData } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
 
         const localAnomalias = getStoredAnomalias();
         const baseAnomalias = localAnomalias.length > 0 ? localAnomalias : (aData && aData.length > 0 ? aData : MOCK_ANOMALIAS);
@@ -88,14 +88,14 @@ export default function AnomaliasPage() {
           <p className="text-xs text-slate-500 font-mono py-6 text-center">Nenhuma anomalia registada para o filtro selecionado.</p>
         ) : (
           filtered.map((a) => {
-            const v = viaturas.find((item) => item.id === a.viatura_id);
+            const v = viaturas.find((item) => item.id === a.viatura_id || item.matricula === a.viatura_id) || MOCK_VIATURAS.find((item) => item.id === a.viatura_id || item.matricula === a.viatura_id) || viaturas[0];
 
             return (
               <div key={a.id} className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
                   <div className="flex items-center space-x-3">
-                    <span className="font-mono font-black text-lg text-slate-100">{v?.matricula || 'VTR'}</span>
-                    <span className="text-xs text-slate-400 font-semibold">{v?.modelo}</span>
+                    <span className="font-mono font-black text-lg text-emerald-400 font-bold">{v?.matricula || 'AM-96-12'}</span>
+                    <span className="text-xs text-slate-400 font-semibold">{v?.modelo || 'Nissan Navara 4x4'}</span>
                   </div>
 
                   <div className="flex items-center space-x-2">
