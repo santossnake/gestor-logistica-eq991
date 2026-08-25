@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Building, Camera, CheckCircle2, Shield, Calendar, User, Phone, Mail, FileText, AlertCircle, ArrowRight, Edit2, Trash2, Printer, Download, X } from 'lucide-react';
+import { Building, Camera, CheckCircle2, Shield, Calendar, User, Phone, Mail, FileText, AlertCircle, ArrowRight, Edit2, Trash2, Printer, Download, X, Upload } from 'lucide-react';
 import { supabase, isSupabaseConfigured, Viatura, EmprestimoExterno, FotoEmprestimo } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_EMPRESTIMOS, MOCK_FOTOS_EMPRESTIMO } from '@/lib/mock-data';
 import { POSTOS_FORCA_AEREA, getStoredEmprestimos, saveStoredEmprestimos, saveFleetOverride } from '@/lib/utils/cookies';
@@ -20,6 +20,9 @@ export default function EmprestimosPage() {
   const [viaturas, setViaturas] = useState<Viatura[]>([]);
   const [emprestimos, setEmprestimos] = useState<EmprestimoExterno[]>([]);
   const [fotos, setFotos] = useState<FotoEmprestimo[]>([]);
+
+  // PDF Auto Modal State
+  const [selectedEmprestimoForPdf, setSelectedEmprestimoForPdf] = useState<EmprestimoExterno | null>(null);
 
   // Form states
   const [selectedViaturaId, setSelectedViaturaId] = useState<string>('');
@@ -108,112 +111,11 @@ export default function EmprestimosPage() {
     reader.readAsDataURL(file);
   };
 
-  // PDF AUTO DE EMPRÉSTIMO GENERATOR
+  // PDF AUTO DE EMPRÉSTIMO GENERATOR (Abre Modal de Impressão/PDF)
   const gerarPDFAutoEmprestimo = (emp: EmprestimoExterno) => {
-    const viatura = viaturas.find((v) => v.id === emp.viatura_id);
-    const vMatricula = viatura ? viatura.matricula : 'AM-96-12';
-    const vModelo = viatura ? viatura.modelo : 'Nissan Navara 4x4';
-    const dataEmissao = new Date(emp.data_inicio || Date.now()).toLocaleString('pt-PT');
-    const dataFim = new Date(emp.data_fim_prevista).toLocaleString('pt-PT');
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Por favor permita pop-ups no seu navegador para visualizar/descarregar o Auto de Empréstimo em PDF.');
-      return;
-    }
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="pt">
-      <head>
-        <meta charset="UTF-8">
-        <title>Auto de Empréstimo Externa - Esquadra 991</title>
-        <style>
-          body { font-family: 'Courier New', Courier, monospace, Arial, sans-serif; margin: 40px; color: #0f172a; line-height: 1.5; }
-          .header { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 15px; margin-bottom: 25px; }
-          .header h1 { font-size: 20px; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
-          .header h2 { font-size: 14px; margin: 5px 0 0 0; color: #475569; }
-          .badge { display: inline-block; background: #0f172a; color: #ffffff; padding: 4px 12px; font-weight: bold; font-size: 12px; margin-top: 10px; border-radius: 4px; }
-          .section { margin-bottom: 20px; border: 1px solid #cbd5e1; padding: 15px; border-radius: 6px; }
-          .section-title { font-weight: bold; font-size: 13px; text-transform: uppercase; background: #f1f5f9; padding: 4px 8px; margin: -15px -15px 12px -15px; border-bottom: 1px solid #cbd5e1; border-top-left-radius: 5px; border-top-right-radius: 5px; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; }
-          .label { color: #64748b; font-size: 11px; text-transform: uppercase; }
-          .value { font-weight: bold; font-size: 13px; }
-          .footer { margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; text-align: center; font-size: 11px; }
-          .signature-box { border-top: 1px solid #0f172a; padding-top: 8px; margin-top: 50px; }
-          @media print { body { margin: 20px; } .no-print { display: none; } }
-        </style>
-      </head>
-      <body>
-        <div class="no-print" style="margin-bottom: 20px; text-align: right;">
-          <button onclick="window.print()" style="padding: 10px 20px; background: #059669; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: sans-serif;">
-            🖨️ Imprimir / Descarregar em PDF
-          </button>
-        </div>
-
-        <div class="header">
-          <h1>FORÇA AÉREA PORTUGUESA — ESQUADRA 991</h1>
-          <h2>AUTO DE CEDÊNCIA E EMPRÉSTIMO EXTERNO DE VIATURA</h2>
-          <div class="badge">DOCUMENTO OFICIAL DE TRANSPORTE TERRESTRE</div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">1. Identificação do Auto & Veículo</div>
-          <div class="grid">
-            <div><div class="label">Número do Auto</div><div class="value">AUTO-EMP-991-${emp.id.slice(-6).toUpperCase()}</div></div>
-            <div><div class="label">Data de Emissão</div><div class="value">${dataEmissao}</div></div>
-            <div><div class="label">Viatura Atribuída</div><div class="value">${vMatricula} — ${vModelo}</div></div>
-            <div><div class="label">Odómetro de Saída</div><div class="value">${emp.km_inicio ? emp.km_inicio.toLocaleString() : 'N/D'} KM</div></div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">2. Entidade Recetora & Responsável</div>
-          <div class="grid">
-            <div><div class="label">Entidade Externa Recetora</div><div class="value">${emp.entidade_externa}</div></div>
-            <div><div class="label">Militar / Responsável</div><div class="value">${emp.nome_responsavel}</div></div>
-            <div><div class="label">Contacto Telefónico</div><div class="value">${emp.contacto_responsavel}</div></div>
-            <div><div class="label">Email Institucional</div><div class="value">${emp.email_responsavel || 'N/D'}</div></div>
-            <div><div class="label">Data Prevista de Devolução</div><div class="value">${dataFim}</div></div>
-            <div><div class="label">Estado da Cedência</div><div class="value">${emp.estado}</div></div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">3. Observações & Estado de Conservação Inicial</div>
-          <p style="font-size: 12px; margin: 0; white-space: pre-wrap;">${emp.observacoes_inicial || 'Viatura cedida em estado operacional regular, sem danos impeditivos registados.'}</p>
-        </div>
-
-        <div class="section">
-          <div class="section-title">4. Termos de Responsabilidade Operacional</div>
-          <ol style="font-size: 11px; margin: 0; padding-left: 20px;">
-            <li>A entidade recetora responsabiliza-se pela condução segura, abastecimento de combustível e conservação do veículo.</li>
-            <li>Qualquer acidente, dano ou anomalia mecânica deve ser reportado imediatamente à Logística da Esquadra 991.</li>
-            <li>A viatura deve ser restituída na data fixada com o mesmo nível de combustível e higienização.</li>
-          </ol>
-        </div>
-
-        <div class="footer">
-          <div>
-            <div class="signature-box">
-              <strong>Pelo Cedente (Logística Esquadra 991)</strong><br>
-              <span style="font-size: 10px; color: #64748b;">Assinatura e Carimbo Oficial</span>
-            </div>
-          </div>
-          <div>
-            <div class="signature-box">
-              <strong>Pelo Recetor (${emp.nome_responsavel})</strong><br>
-              <span style="font-size: 10px; color: #64748b;">Assinatura do Responsável Externo</span>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    setSelectedEmprestimoForPdf(emp);
   };
+
 
   const handleOpenEditModal = (emp: EmprestimoExterno) => {
     setEditingEmprestimo(emp);
@@ -521,24 +423,65 @@ export default function EmprestimosPage() {
           </div>
         </div>
 
-        {/* Section 2: Mandatory Photographic Inspection Grid */}
+        {/* Section 2: Photographic Inspection Grid (Optional) */}
         <div className="p-5 rounded-2xl glass-panel space-y-4 border border-slate-800">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center space-x-2">
               <Camera className="w-4 h-4" />
-              <span>2. Auto de Vistoria Fotográfico Obrigatório (6+ Ângulos)</span>
+              <span>2. Auto de Vistoria Fotográfico (Opcional - Câmara & Galeria)</span>
             </h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {ANGULOS_INSPECAO.map((ang: any) => (
               <div key={ang.id} className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <span className="text-[11px] font-mono text-slate-300 font-bold block">{ang.label}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleSimularUploadFoto(ang.id, e)}
-                  className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-purple-900/60 file:text-purple-300 hover:file:bg-purple-800 cursor-pointer"
-                />
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-slate-300 font-bold block">{ang.label}</span>
+                  {fotosUpload[ang.id] && (
+                    <span className="text-[10px] bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-800 font-mono">✓ Carregada</span>
+                  )}
+                </div>
+
+                {fotosUpload[ang.id] ? (
+                  <div className="relative group">
+                    <img src={fotosUpload[ang.id]} alt={ang.label} className="w-full h-24 object-cover rounded-lg border border-slate-700" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = { ...fotosUpload };
+                        delete next[ang.id];
+                        setFotosUpload(next);
+                      }}
+                      className="absolute top-1 right-1 p-1 bg-rose-950/90 text-rose-300 border border-rose-800 rounded text-[10px] font-bold"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <label className="cursor-pointer py-2.5 px-2 bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 border border-purple-800/80 rounded-lg text-center font-mono font-bold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all">
+                      <Camera className="w-4 h-4 text-purple-400" />
+                      <span>📷 Câmara</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={(e) => handleSimularUploadFoto(ang.id, e)}
+                        className="hidden"
+                      />
+                    </label>
+
+                    <label className="cursor-pointer py-2.5 px-2 bg-slate-950/80 hover:bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-center font-mono font-bold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all">
+                      <Upload className="w-4 h-4 text-slate-400" />
+                      <span>📁 Ficheiro</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleSimularUploadFoto(ang.id, e)}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -763,6 +706,184 @@ export default function EmprestimosPage() {
           </div>
         </div>
       )}
+
+      {/* READ-ONLY PRINTABLE PDF AUTO MODAL */}
+      {selectedEmprestimoForPdf && (() => {
+        const v = viaturas.find((item) => item.id === selectedEmprestimoForPdf.viatura_id);
+        const dataEmissao = new Date(selectedEmprestimoForPdf.data_inicio || Date.now()).toLocaleString('pt-PT');
+        const dataFim = new Date(selectedEmprestimoForPdf.data_fim_prevista).toLocaleString('pt-PT');
+
+        const handleDownloadHtmlFile = () => {
+          const content = document.getElementById('auto-pdf-document-container')?.innerHTML || '';
+          const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Auto de Cedencia EQ991</title><style>body{font-family:monospace;padding:30px;color:#000;}</style></head><body>${content}</body></html>`;
+          const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Auto_Cedencia_${selectedEmprestimoForPdf.entidade_externa.replace(/\s+/g, '_')}.html`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl space-y-4 p-4 sm:p-6 text-slate-100 font-mono my-auto max-h-[92vh] flex flex-col">
+              
+              {/* Modal Header & Action Buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3 flex-shrink-0">
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-5 h-5 text-emerald-400" />
+                  <h3 className="font-bold text-sm sm:text-base text-white uppercase tracking-wider">
+                    Auto de Cedência & Empréstimo Externa (FAP / EQ991)
+                  </h3>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-1 shadow-lg"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Imprimir / PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadHtmlFile}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center space-x-1 shadow-lg"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Descarregar Auto</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEmprestimoForPdf(null)}
+                    className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Document Body (Printable Container) */}
+              <div id="auto-pdf-document-container" className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-5 text-xs overflow-y-auto flex-1">
+                
+                {/* Air Force Document Header */}
+                <div className="text-center border-b border-slate-700 pb-4 space-y-1">
+                  <h2 className="text-base font-black text-white uppercase tracking-widest">
+                    FORÇA AÉREA PORTUGUESA — ESQUADRA 991
+                  </h2>
+                  <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider">
+                    AUTO DE CEDÊNCIA E EMPRÉSTIMO EXTERNO DE VIATURA
+                  </p>
+                  <span className="inline-block bg-slate-800 text-slate-300 px-3 py-0.5 rounded text-[10px] font-bold border border-slate-700">
+                    DOCUMENTO OFICIAL DE TRANSPORTE TERRESTRE DA ESQUADRA 991
+                  </span>
+                </div>
+
+                {/* Section 1: Auto & Vehicle Info */}
+                <div className="bg-slate-900/90 p-3.5 rounded-lg border border-slate-800 space-y-2">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block border-b border-slate-800 pb-1">
+                    1. Identificação do Auto & Veículo Cedido
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Nº DO AUTO</span>
+                      <strong className="text-emerald-400 text-xs">AUTO-EMP-991-{selectedEmprestimoForPdf.id.slice(-6).toUpperCase()}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">EMISSÃO</span>
+                      <span className="text-slate-200">{dataEmissao}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">VIATURA</span>
+                      <span className="text-slate-100 font-bold">{v ? v.matricula : 'AM-96-12'} ({v ? v.modelo : 'Nissan Navara'})</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">ODÓMETRO INICIAL</span>
+                      <span className="text-amber-400 font-bold">{selectedEmprestimoForPdf.km_inicio ? selectedEmprestimoForPdf.km_inicio.toLocaleString() : 'N/D'} KM</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: External Entity & Driver Info */}
+                <div className="bg-slate-900/90 p-3.5 rounded-lg border border-slate-800 space-y-2">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block border-b border-slate-800 pb-1">
+                    2. Entidade Recetora & Responsável Externo
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">ENTIDADE EXTERNA</span>
+                      <strong className="text-purple-300 text-xs">{selectedEmprestimoForPdf.entidade_externa}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">RESPONSÁVEL</span>
+                      <span className="text-slate-100 font-bold">{selectedEmprestimoForPdf.nome_responsavel}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">CONTACTO TELEFÓNICO</span>
+                      <span className="text-slate-300 font-mono">{selectedEmprestimoForPdf.contacto_responsavel}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">EMAIL INSTITUCIONAL</span>
+                      <span className="text-slate-300">{selectedEmprestimoForPdf.email_responsavel || 'N/D'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">DATA PREVISTA DEVOLUÇÃO</span>
+                      <span className="text-amber-300 font-bold">{dataFim}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">ESTADO DA CEDÊNCIA</span>
+                      <span className="text-purple-400 font-bold">{selectedEmprestimoForPdf.estado}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Initial State & Notes */}
+                <div className="bg-slate-900/90 p-3.5 rounded-lg border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block border-b border-slate-800 pb-1">
+                    3. Observações & Estado de Conservação Inicial
+                  </span>
+                  <p className="text-slate-300 text-[11px] leading-relaxed pt-1">
+                    {selectedEmprestimoForPdf.observacoes_inicial || 'Viatura cedida em estado operacional regular, sem danos impeditivos registados.'}
+                  </p>
+                </div>
+
+                {/* Section 4: Operational Rules */}
+                <div className="bg-slate-900/90 p-3.5 rounded-lg border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block border-b border-slate-800 pb-1">
+                    4. Termos de Responsabilidade Operacional
+                  </span>
+                  <ol className="list-decimal list-inside text-[11px] text-slate-400 space-y-1 pt-1">
+                    <li>A entidade recetora responsabiliza-se pela condução segura, abastecimento de combustível e conservação do veículo.</li>
+                    <li>Qualquer acidente, dano ou anomalia mecânica deve ser reportado imediatamente à Logística da Esquadra 991.</li>
+                    <li>A viatura deve ser restituída na data fixada com o mesmo nível de combustível e higienização.</li>
+                  </ol>
+                </div>
+
+                {/* Signatures Footer */}
+                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-800 text-center text-[10px]">
+                  <div className="space-y-6">
+                    <div className="border-t border-slate-600 pt-1">
+                      <strong className="text-slate-200 block text-[11px]">Pelo Cedente (Logística Esquadra 991)</strong>
+                      <span className="text-slate-500">Assinatura e Carimbo Oficial</span>
+                    </div>
+                  </div>
+                  <div className="space-y-6">
+                    <div className="border-t border-slate-600 pt-1">
+                      <strong className="text-slate-200 block text-[11px]">Pelo Recetor ({selectedEmprestimoForPdf.nome_responsavel})</strong>
+                      <span className="text-slate-500">Assinatura do Responsável Externo</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
