@@ -295,6 +295,30 @@ export function saveStoredEmprestimos(emprestimos: any[]): void {
 }
 
 // ==========================================
+// LOCAL PERSISTENCE FOR FOTOS DE EMPRÉSTIMO
+// ==========================================
+const FOTOS_EMPRESTIMO_STORAGE_KEY = 'eq991_fotos_emprestimo_v1';
+
+export function getStoredFotosEmprestimo(): any[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(FOTOS_EMPRESTIMO_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export function saveStoredFotosEmprestimo(fotos: any[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(FOTOS_EMPRESTIMO_STORAGE_KEY, JSON.stringify(fotos));
+  } catch (err) {
+    console.error('Erro ao guardar fotos de empréstimo localmente:', err);
+  }
+}
+
+// ==========================================
 // LOCAL PERSISTENCE FOR REGISTOS DE MARCHA
 // ==========================================
 const MARCHAS_STORAGE_KEY = 'eq991_marchas_db_v1';

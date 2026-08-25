@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Building, Camera, CheckCircle2, Shield, Calendar, User, Phone, Mail, FileText, AlertCircle, ArrowRight, Edit2, Trash2, Printer, Download, X, Upload } from 'lucide-react';
 import { supabase, isSupabaseConfigured, Viatura, EmprestimoExterno, FotoEmprestimo } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_EMPRESTIMOS, MOCK_FOTOS_EMPRESTIMO } from '@/lib/mock-data';
-import { POSTOS_FORCA_AEREA, getStoredEmprestimos, saveStoredEmprestimos, saveFleetOverride } from '@/lib/utils/cookies';
+import { POSTOS_FORCA_AEREA, getStoredEmprestimos, saveStoredEmprestimos, saveFleetOverride, getStoredFotosEmprestimo, saveStoredFotosEmprestimo } from '@/lib/utils/cookies';
 
 const ANGULOS_INSPECAO = [
   { id: 'FRENTE', label: '1. Frente / Para-choques (Opcional)', req: false },
@@ -60,11 +60,13 @@ export default function EmprestimosPage() {
         });
 
         const localEmp = getStoredEmprestimos();
+        const localFotos = getStoredFotosEmprestimo();
         const baseEmp = localEmp.length > 0 ? localEmp : (eData || []);
+        const baseFotos = [...(fData || []), ...localFotos];
 
         setViaturas(rawFleet);
         setEmprestimos(baseEmp);
-        setFotos(fData || []);
+        setFotos(baseFotos);
 
         if (rawFleet.length > 0) {
           setSelectedViaturaId(rawFleet[0].id);
@@ -244,18 +246,29 @@ export default function EmprestimosPage() {
       }
 
       // Save photos if uploaded
-      if (Object.keys(fotosUpload).length > 0 && isSupabaseConfigured()) {
-        try {
-          const fotoRecords = Object.entries(fotosUpload).map(([angulo, url]) => ({
-            emprestimo_id: payloadEmprestimo.id,
-            tipo_fase: 'INICIO' as const,
-            angulo_zona: angulo as any,
-            foto_url: url
-          }));
-          await supabase.from('fotos_emprestimo').insert(fotoRecords);
-        } catch (netErr) {
-          console.warn('Erro ao guardar fotos no Supabase:', netErr);
+      const newFotoRecords = Object.entries(fotosUpload).map(([angulo, url]) => ({
+        id: `foto-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        emprestimo_id: payloadEmprestimo.id,
+        tipo_fase: 'INICIO' as const,
+        angulo_zona: angulo as any,
+        foto_url: url,
+        created_at: new Date().toISOString()
+      }));
+
+      if (newFotoRecords.length > 0) {
+        if (isSupabaseConfigured()) {
+          try {
+            await supabase.from('fotos_emprestimo').insert(
+              newFotoRecords.map(({ id, created_at, ...rest }) => rest)
+            );
+          } catch (netErr) {
+            console.warn('Erro ao guardar fotos no Supabase:', netErr);
+          }
         }
+
+        const allFotos = [...newFotoRecords, ...fotos];
+        setFotos(allFotos);
+        saveStoredFotosEmprestimo(allFotos);
       }
 
       // Update local storage mirror
