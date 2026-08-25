@@ -485,9 +485,17 @@ export default function MovimentosViaturasPage() {
                           </div>
                         </>
                       ) : (
-                        <div className="py-2 text-blue-400 font-bold text-xs flex items-center space-x-1">
-                          <Clock className="w-3.5 h-3.5 animate-spin" />
-                          <span>Em utilização ativa no terreno</span>
+                        <div className="space-y-1 pt-0.5">
+                          <div className="text-blue-400 font-bold text-xs flex items-center space-x-1">
+                            <Clock className="w-3.5 h-3.5 animate-spin text-blue-400" />
+                            <span>Em utilização ativa no terreno</span>
+                          </div>
+                          <div className="text-emerald-300 font-black text-sm pt-1">
+                            Condutor: {m.trigrama_ou_condutor_inicio || m.nip_inicio}
+                          </div>
+                          <div className="text-slate-300 text-[11px]">
+                            NIP: <strong className="text-white">{m.nip_inicio}</strong>
+                          </div>
                         </div>
                       )}
                     </div>
