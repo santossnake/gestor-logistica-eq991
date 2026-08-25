@@ -340,26 +340,97 @@ export default function ChavePage() {
     }
   };
 
-  // Handler: Alternar Condutor
+  // Handler: Alternar Condutor (Encerra marcha anterior e abre novo levantamento em nome do novo condutor)
   const handleAlternarCondutor = async () => {
-    if (!profile.nip || !profile.trigramaOuCondutor || !marchaAtiva) {
+    if (!viatura || !profile.nip || !profile.trigramaOuCondutor) {
       setErrorMsg('Por favor preencha o NIP e Trigrama/Posto e Nome do novo condutor.');
       return;
     }
     saveMilitaryProfile(profile);
+    setErrorMsg('');
+
+    const now = new Date().toISOString();
+    const currentKm = viatura.km_atuais || kmInicialInput;
 
     try {
+      // 1. FECHO DA MARCHA ANTERIOR (Grava registo de devolução/entrega)
+      if (marchaAtiva) {
+        const updatePayload = {
+          nip_fim: profile.nip,
+          trigrama_ou_condutor_fim: profile.trigramaOuCondutor,
+          km_final: currentKm,
+          localizacao_chave: viatura.localizacao_atual_chave || 'Em Troca de Serviço',
+          localizacao_viatura: viatura.localizacao_atual_viatura || 'Em Troca de Serviço',
+          data_chegada: now
+        };
+
+        if (isSupabaseConfigured()) {
+          try {
+            let { error } = await supabase.from('registos_marcha').update(updatePayload).eq('id', marchaAtiva.id);
+            if (error && (error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
+              const { trigrama_ou_condutor_fim, ...cleanUpdate } = updatePayload;
+              await supabase.from('registos_marcha').update(cleanUpdate).eq('id', marchaAtiva.id);
+            }
+          } catch (netErr: any) {
+            console.warn('Erro de rede ao encerrar marcha anterior no Supabase:', netErr);
+          }
+        }
+
+        // Atualiza marcha anterior no armazenamento local
+        const currentMarchas = getStoredMarchas();
+        const closedMarchaObj = { ...marchaAtiva, ...updatePayload };
+        saveStoredMarchas([closedMarchaObj, ...currentMarchas.filter((m: any) => m.id !== marchaAtiva.id)]);
+      }
+
+      // 2. CRIAÇÃO DE NOVO REGISTO DE LEVANTAMENTO (Nova marcha para quem assumiu a função)
+      const newMarcha = {
+        viatura_id: viatura.id,
+        nip_inicio: profile.nip,
+        trigrama_ou_condutor_inicio: profile.trigramaOuCondutor,
+        destino_funcao: profile.destinoFuncao || marchaAtiva?.destino_funcao || 'Serviço Geral',
+        km_inicial: currentKm,
+        data_saida: now
+      };
+
+      let newMarchaRec: any = null;
+
+      if (isSupabaseConfigured()) {
+        try {
+          let { data, error } = await supabase.from('registos_marcha').insert([newMarcha]).select();
+
+          if (error && (error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
+            const { trigrama_ou_condutor_inicio, destino_funcao, ...cleanPayload } = newMarcha;
+            const retry = await supabase.from('registos_marcha').insert([cleanPayload]).select();
+            data = retry.data;
+          }
+
+          if (data && data.length > 0) {
+            newMarchaRec = data[0];
+          }
+        } catch (netErr: any) {
+          console.warn('Erro de rede ao criar nova marcha de troca no Supabase:', netErr);
+        }
+      }
+
+      newMarchaRec = newMarchaRec || { id: `mar-${Date.now()}`, ...newMarcha };
+      setMarchaAtiva(newMarchaRec);
+
+      // Guarda a nova marcha no espelho local
+      const updatedMarchas = getStoredMarchas();
+      saveStoredMarchas([newMarchaRec, ...updatedMarchas.filter((m: any) => m.id !== newMarchaRec.id)]);
+
+      // 3. REGISTAR EVENTO GPS DE TROCA DE CONDUTOR
       if (isSupabaseConfigured()) {
         try {
           await supabase.from('historico_posicoes_gps').insert([
             {
-              viatura_id: viatura?.id,
-              registo_marcha_id: marchaAtiva.id,
+              viatura_id: viatura.id,
+              registo_marcha_id: newMarchaRec.id,
               nip_operador: profile.nip,
-              latitude: viatura?.latitude_atual || 39.094,
-              longitude: viatura?.longitude_atual || -8.967,
+              latitude: viatura.latitude_atual || 39.094,
+              longitude: viatura.longitude_atual || -8.967,
               tipo_evento: 'PING_PERCURSO',
-              registado_at: new Date().toISOString()
+              registado_at: now
             }
           ]);
         } catch (netErr: any) {
@@ -367,9 +438,11 @@ export default function ChavePage() {
         }
       }
 
-      alert(`Condutor alterado com sucesso para ${profile.trigramaOuCondutor} (NIP: ${profile.nip}). O rastreio GPS continuará ativado.`);
-    } catch (err) {
+      alert(`Troca de condutor registada com sucesso! A marcha anterior foi encerrada e foi criado um novo levantamento em nome de ${profile.trigramaOuCondutor} (NIP: ${profile.nip}).`);
+      setActiveTab('FINALIZAR');
+    } catch (err: any) {
       console.error(err);
+      setErrorMsg(err.message || 'Erro ao alternar condutor.');
     }
   };
 
