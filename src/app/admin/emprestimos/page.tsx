@@ -863,6 +863,44 @@ export default function EmprestimosPage() {
                   </ol>
                 </div>
 
+                {/* Section 5: Photographic Inspection Grid in Auto PDF */}
+                {(() => {
+                  const pdfFotos = fotos.filter((f) => f.emprestimo_id === selectedEmprestimoForPdf.id);
+                  const uploadEntries = Object.entries(fotosUpload);
+                  const hasFotos = pdfFotos.length > 0 || uploadEntries.length > 0;
+
+                  return (
+                    <div className="bg-slate-900/90 p-3.5 rounded-lg border border-slate-800 space-y-2">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block border-b border-slate-800 pb-1 flex items-center justify-between">
+                        <span>5. Registo de Vistoria Fotográfica da Viatura</span>
+                        <span className="text-[9px] text-purple-300">
+                          {hasFotos ? `${pdfFotos.length || uploadEntries.length} Fotografia(s) Anexadas` : 'Sem Fotos'}
+                        </span>
+                      </span>
+
+                      {!hasFotos ? (
+                        <p className="text-[11px] text-slate-500 italic py-1">Sem fotografias anexadas ao auto de cedência.</p>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                          {pdfFotos.map((f) => (
+                            <div key={f.id} className="p-1.5 bg-slate-950 rounded-lg border border-slate-800 text-center space-y-1">
+                              <img src={f.foto_url} alt={f.angulo_zona} className="w-full h-24 object-cover rounded-md border border-slate-700" />
+                              <span className="text-[9px] text-slate-400 font-mono block uppercase font-bold">{f.angulo_zona}</span>
+                            </div>
+                          ))}
+
+                          {pdfFotos.length === 0 && uploadEntries.map(([ang, url]) => (
+                            <div key={ang} className="p-1.5 bg-slate-950 rounded-lg border border-slate-800 text-center space-y-1">
+                              <img src={url} alt={ang} className="w-full h-24 object-cover rounded-md border border-slate-700" />
+                              <span className="text-[9px] text-slate-400 font-mono block uppercase font-bold">{ang}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Signatures Footer */}
                 <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-800 text-center text-[10px]">
                   <div className="space-y-6">
