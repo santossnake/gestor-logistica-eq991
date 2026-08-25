@@ -148,7 +148,7 @@ export interface EmprestimoExterno {
   km_fim?: number;
   observacoes_inicial?: string;
   observacoes_final?: string;
-  estado: 'ATIVO' | 'CONCLUIDO';
+  estado: 'ATIVO' | 'CONCLUIDO' | 'DEVOLVIDO';
   criado_por_admin?: string;
   created_at: string;
 }
