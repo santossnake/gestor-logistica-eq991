@@ -59,14 +59,32 @@ export default function EmprestimosPage() {
           return { ...v, km_atuais: km };
         });
 
+        // Synchronize remote database rows with local storage rows by ID across all devices
+        const remoteEmp = eData || [];
         const localEmp = getStoredEmprestimos();
+        const empMap = new Map<string, EmprestimoExterno>();
+        remoteEmp.forEach((emp) => empMap.set(emp.id, emp));
+        localEmp.forEach((emp) => {
+          if (!empMap.has(emp.id)) {
+            empMap.set(emp.id, emp);
+          }
+        });
+        const mergedEmprestimos = Array.from(empMap.values());
+
+        const remoteFotos = fData || [];
         const localFotos = getStoredFotosEmprestimo();
-        const baseEmp = localEmp.length > 0 ? localEmp : (eData || []);
-        const baseFotos = [...(fData || []), ...localFotos];
+        const fotoMap = new Map<string, FotoEmprestimo>();
+        remoteFotos.forEach((f) => fotoMap.set(f.id, f));
+        localFotos.forEach((f) => {
+          if (!fotoMap.has(f.id)) {
+            fotoMap.set(f.id, f);
+          }
+        });
+        const mergedFotos = Array.from(fotoMap.values());
 
         setViaturas(rawFleet);
-        setEmprestimos(baseEmp);
-        setFotos(baseFotos);
+        setEmprestimos(mergedEmprestimos);
+        setFotos(mergedFotos);
 
         if (rawFleet.length > 0) {
           setSelectedViaturaId(rawFleet[0].id);
@@ -214,6 +232,20 @@ export default function EmprestimosPage() {
     }
   };
 
+  const handleFreeOrphanVehicle = async (viaturaId: string) => {
+    try {
+      if (isSupabaseConfigured()) {
+        await supabase.from('viaturas').update({ estado: 'DISPONIVEL' }).eq('id', viaturaId);
+      }
+      saveFleetOverride(viaturaId, { estado: 'DISPONIVEL' });
+      setViaturas((prev) => prev.map((v) => (v.id === viaturaId ? { ...v, estado: 'DISPONIVEL' } : v)));
+      setSuccessMsg('Viatura libertada com sucesso! Estado reposto para DISPONÍVEL.');
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Erro ao libertar viatura.');
+    }
+  };
+
   const handleCriarEmprestimo = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -221,8 +253,8 @@ export default function EmprestimosPage() {
     setIsSubmitting(true);
 
     try {
-      const payloadEmprestimo: any = {
-        id: `emp-${Date.now()}`,
+      // 1. Prepare DB payload without custom non-UUID string
+      const dbPayload = {
         viatura_id: selectedViaturaId,
         entidade_externa: entidade,
         nome_responsavel: nomeResp,
@@ -232,23 +264,29 @@ export default function EmprestimosPage() {
         data_fim_prevista: new Date(dataFimPrevista).toISOString(),
         km_inicio: kmInicio,
         observacoes_inicial: obsInicial,
-        estado: 'ATIVO' as const,
+        estado: 'ATIVO',
         criado_por_admin: 'Logística EQ991'
       };
 
+      let finalEmpObj: any = { id: `emp-${Date.now()}`, ...dbPayload };
+
       if (isSupabaseConfigured()) {
         try {
-          const { data: empData } = await supabase.from('emprestimos_externos').insert([payloadEmprestimo]).select();
-          if (empData && empData.length > 0) payloadEmprestimo.id = empData[0].id;
+          const { data: empData, error: empErr } = await supabase.from('emprestimos_externos').insert([dbPayload]).select();
+          if (empErr) {
+            console.warn('Aviso ao registar empréstimo no Supabase:', empErr.message);
+          } else if (empData && empData.length > 0) {
+            finalEmpObj = empData[0];
+          }
         } catch (netErr) {
           console.warn('Erro de rede ao registar no Supabase:', netErr);
         }
       }
 
-      // Save photos if uploaded
+      // 2. Save photos with valid loan ID
       const newFotoRecords = Object.entries(fotosUpload).map(([angulo, url]) => ({
         id: `foto-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        emprestimo_id: payloadEmprestimo.id,
+        emprestimo_id: finalEmpObj.id,
         tipo_fase: 'INICIO' as const,
         angulo_zona: angulo as any,
         foto_url: url,
@@ -269,15 +307,15 @@ export default function EmprestimosPage() {
         const allFotos = [...newFotoRecords, ...fotos];
         setFotos(allFotos);
         saveStoredFotosEmprestimo(allFotos);
-        payloadEmprestimo._fotosPreview = newFotoRecords;
+        finalEmpObj._fotosPreview = newFotoRecords;
       }
 
-      // Update local storage mirror
-      const updatedList = [payloadEmprestimo, ...emprestimos];
+      // 3. Update local storage mirror
+      const updatedList = [finalEmpObj, ...emprestimos.filter((item) => item.id !== finalEmpObj.id)];
       setEmprestimos(updatedList);
       saveStoredEmprestimos(updatedList);
 
-      // Update vehicle state to EMPRESTADA_EXTERNO
+      // 4. Update vehicle state to EMPRESTADA_EXTERNO
       if (isSupabaseConfigured()) {
         try {
           await supabase.from('viaturas').update({ estado: 'EMPRESTADA_EXTERNO' }).eq('id', selectedViaturaId);
@@ -296,7 +334,7 @@ export default function EmprestimosPage() {
       setEmailResp('');
 
       // Auto-open PDF Auto
-      gerarPDFAutoEmprestimo(payloadEmprestimo);
+      gerarPDFAutoEmprestimo(finalEmpObj);
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao guardar cedência externa.');
     } finally {
@@ -336,6 +374,25 @@ export default function EmprestimosPage() {
           <span>{successMsg}</span>
         </div>
       )}
+
+      {/* ORPHAN VEHICLES BANNER (Self-healing for loans created on other devices before UUID fix) */}
+      {viaturas.filter((v) => v.estado === 'EMPRESTADA_EXTERNO' && !emprestimos.some((e) => e.viatura_id === v.id && (e.estado === 'ATIVO' || (e as any).estado === 'ATIVO'))).map((v) => (
+        <div key={v.id} className="p-3.5 rounded-xl bg-amber-950/90 border border-amber-500/60 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg font-mono">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>
+              A viatura <strong>{v.matricula} ({v.modelo})</strong> está assinalada como &quot;Emprestada&quot;, mas o auto de cedência anterior não ficou registado no servidor.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleFreeOrphanVehicle(v.id)}
+            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs uppercase flex-shrink-0 transition-colors shadow"
+          >
+            Libertar Viatura (Disponível)
+          </button>
+        </div>
+      ))}
 
       {/* Form: Nova Cedência Externa com Vistoria */}
       <form onSubmit={handleCriarEmprestimo} className="space-y-6">
