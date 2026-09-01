@@ -64,6 +64,7 @@ export default function ChavePage() {
 
   // Form states for Início de Marcha
   const [kmInicialInput, setKmInicialInput] = useState<number>(initialV.km_atuais);
+  const [isAtribuicaoModo, setIsAtribuicaoModo] = useState<boolean>(false);
 
   // Form states for Finalizar Marcha
   const [kmFinalInput, setKmFinalInput] = useState<number>(initialV.km_atuais);
@@ -303,18 +304,20 @@ export default function ChavePage() {
 
   // Handler: Iniciar Marcha
   const handleIniciarMarcha = async () => {
-    if (!viatura || !profile.nip || !profile.trigramaOuCondutor || !profile.destinoFuncao) {
-      setErrorMsg('Por favor preencha todos os campos obrigatórios (NIP, Trigrama ou Posto e Nome, Destino / Função).');
+    if (!viatura || !profile.trigramaOuCondutor || !profile.destinoFuncao) {
+      setErrorMsg('Por favor preencha os campos obrigatórios (Trigrama ou Posto e Nome, Destino / Função).');
       return;
     }
 
-    saveMilitaryProfile(profile);
+    const nipVal = profile.nip && profile.nip.trim() ? profile.nip.trim() : 'N/D';
+    const profileToSave = { ...profile, nip: nipVal };
+    saveMilitaryProfile(profileToSave);
     setErrorMsg('');
 
     try {
       const newMarcha = {
         viatura_id: viatura.id,
-        nip_inicio: profile.nip,
+        nip_inicio: nipVal,
         trigrama_ou_condutor_inicio: profile.trigramaOuCondutor,
         destino_funcao: profile.destinoFuncao,
         km_inicial: kmInicialInput,
@@ -371,11 +374,12 @@ export default function ChavePage() {
 
   // Handler: Alternar Condutor (Encerra marcha anterior e abre novo levantamento em nome do novo condutor)
   const handleAlternarCondutor = async () => {
-    if (!viatura || !profile.nip || !profile.trigramaOuCondutor) {
-      setErrorMsg('Por favor preencha o NIP e Trigrama/Posto e Nome do novo condutor.');
+    if (!viatura || !profile.trigramaOuCondutor) {
+      setErrorMsg('Por favor introduza o Trigrama / Posto e Nome do novo condutor.');
       return;
     }
-    saveMilitaryProfile(profile);
+    const nipVal = profile.nip && profile.nip.trim() ? profile.nip.trim() : 'N/D';
+    saveMilitaryProfile({ ...profile, nip: nipVal });
     setErrorMsg('');
 
     const now = new Date().toISOString();
@@ -385,7 +389,7 @@ export default function ChavePage() {
       // 1. FECHO DA MARCHA ANTERIOR (Grava registo de devolução/entrega)
       if (marchaAtiva) {
         const updatePayload = {
-          nip_fim: profile.nip,
+          nip_fim: nipVal,
           trigrama_ou_condutor_fim: profile.trigramaOuCondutor,
           km_final: currentKm,
           localizacao_chave: viatura.localizacao_atual_chave || 'Em Troca de Serviço',
@@ -414,7 +418,7 @@ export default function ChavePage() {
       // 2. CRIAÇÃO DE NOVO REGISTO DE LEVANTAMENTO (Nova marcha para quem assumiu a função)
       const newMarcha = {
         viatura_id: viatura.id,
-        nip_inicio: profile.nip,
+        nip_inicio: nipVal,
         trigrama_ou_condutor_inicio: profile.trigramaOuCondutor,
         destino_funcao: profile.destinoFuncao || marchaAtiva?.destino_funcao || 'Serviço Geral',
         km_inicial: currentKm,
@@ -455,7 +459,7 @@ export default function ChavePage() {
             {
               viatura_id: viatura.id,
               registo_marcha_id: newMarchaRec.id,
-              nip_operador: profile.nip,
+              nip_operador: nipVal,
               latitude: viatura.latitude_atual || 39.094,
               longitude: viatura.longitude_atual || -8.967,
               tipo_evento: 'PING_PERCURSO',
@@ -467,7 +471,7 @@ export default function ChavePage() {
         }
       }
 
-      alert(`Troca de condutor registada com sucesso! A marcha anterior foi encerrada e foi criado um novo levantamento em nome de ${profile.trigramaOuCondutor} (NIP: ${profile.nip}).`);
+      alert(`Troca de condutor registada com sucesso! A marcha anterior foi encerrada e foi criado um novo levantamento em nome de ${profile.trigramaOuCondutor} (NIP: ${nipVal}).`);
       setActiveTab('FINALIZAR');
     } catch (err: any) {
       console.error(err);
@@ -477,17 +481,19 @@ export default function ChavePage() {
 
   // Handler: Finalizar Marcha
   const handleFinalizarMarcha = async () => {
-    if (!viatura || !profile.nip || !profile.trigramaOuCondutor) {
-      setErrorMsg('Por favor indique o NIP e Trigrama ou Posto e Nome de quem entrega a chave.');
+    if (!viatura || !profile.trigramaOuCondutor) {
+      setErrorMsg('Por favor indique o Trigrama ou Posto e Nome de quem entrega a chave.');
       return;
     }
+
+    const nipVal = profile.nip && profile.nip.trim() ? profile.nip.trim() : 'N/D';
 
     if (kmFinalInput < (marchaAtiva?.km_inicial || viatura.km_atuais)) {
       setErrorMsg(`Erro: Os quilómetros finais (${kmFinalInput}) não podem ser inferiores aos iniciais (${marchaAtiva?.km_inicial || viatura.km_atuais}).`);
       return;
     }
 
-    saveMilitaryProfile(profile);
+    saveMilitaryProfile({ ...profile, nip: nipVal });
     setErrorMsg('');
 
     const finalKeyLoc = locChaveSelected === 'Outro...' ? customLocChave || 'Local Outro' : locChaveSelected;
@@ -749,34 +755,73 @@ export default function ChavePage() {
       {/* TAB 1: INICIAR MARCHA */}
       {activeTab === 'INICIAR' && (
         <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-4">
-          <h2 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center space-x-2">
-            <Play className="w-4 h-4" />
-            <span>Registo de Início de Marcha (Levantamento)</span>
-          </h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <h2 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center space-x-2">
+              <Play className="w-4 h-4" />
+              <span>Registo de Início de Marcha (Levantamento)</span>
+            </h2>
+
+            {/* Toggle Mode: Levantamento Direto vs Atribuição a Terceiro */}
+            <div className="flex items-center space-x-1 font-mono text-[11px]">
+              <button
+                type="button"
+                onClick={() => setIsAtribuicaoModo(false)}
+                className={`px-2.5 py-1 rounded-lg transition-colors ${
+                  !isAtribuicaoModo ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'
+                }`}
+              >
+                Em meu nome
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAtribuicaoModo(true)}
+                className={`px-2.5 py-1 rounded-lg transition-colors ${
+                  isAtribuicaoModo ? 'bg-purple-600 text-white font-bold' : 'bg-slate-900 text-purple-400 hover:text-white'
+                }`}
+              >
+                👤 Atribuir a outro
+              </button>
+            </div>
+          </div>
+
+          {isAtribuicaoModo && (
+            <div className="p-3.5 rounded-xl bg-purple-950/50 border border-purple-500/50 space-y-1 text-xs">
+              <div className="flex items-center space-x-1.5 text-purple-300 font-bold">
+                <User className="w-4 h-4 text-purple-400" />
+                <span>Atribuição de Viatura a Outro Condutor (Registo por Terceiro)</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Preencha os dados do militar que vai efetivamente conduzir a viatura caso o próprio não tenha acedido à aplicação.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-3 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">NIP do Condutor *</label>
-                <input
-                  type="text"
-                  required
-                  value={profile.nip}
-                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                  placeholder="Ex: 134890-A"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Trigrama ou Posto e Nome *</label>
+                <label className="block text-slate-400 mb-1 font-semibold">
+                  Trigrama ou Posto e Nome do Condutor *
+                </label>
                 <input
                   type="text"
                   required
                   value={profile.trigramaOuCondutor || ''}
                   onChange={(e) => setProfile({ ...profile, trigramaOuCondutor: e.target.value })}
-                  placeholder="Ex: OLV ou Tenente Oliveira"
+                  placeholder={isAtribuicaoModo ? "Ex: FER ou Sargento Ferreira" : "Ex: OLV ou Tenente Oliveira"}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">
+                  NIP do Condutor (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={profile.nip || ''}
+                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  placeholder="Ex: 134890-A (Opcional)"
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
                 />
               </div>
@@ -806,39 +851,35 @@ export default function ChavePage() {
             </div>
           </div>
 
-          <button
-            onClick={handleIniciarMarcha}
-            className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-emerald-950 flex items-center justify-center space-x-2 transition-all"
-          >
-            <Play className="w-4 h-4 fill-white" />
-            <span>Iniciar Marcha nesta Viatura</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+            <button
+              onClick={handleIniciarMarcha}
+              className={`w-full py-3.5 px-4 rounded-xl text-white font-bold text-sm uppercase tracking-wider shadow-lg flex items-center justify-center space-x-2 transition-all ${
+                isAtribuicaoModo
+                  ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-950'
+                  : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950'
+              }`}
+            >
+              <Play className="w-4 h-4 fill-white" />
+              <span>{isAtribuicaoModo ? 'Confirmar Atribuição & Iniciar Marcha' : 'Iniciar Marcha nesta Viatura'}</span>
+            </button>
+          </div>
         </div>
       )}
 
-      {/* TAB 2: ALTERNAR CONDUTOR */}
+      {/* TAB 2: ALTERNAR / TROCA DE CONDUTOR */}
       {activeTab === 'ALTERNAR' && (
         <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-4">
           <h2 className="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center space-x-2">
             <RefreshCcw className="w-4 h-4" />
-            <span>Alternar Condutor em Serviço</span>
+            <span>Troca de Condutor / Atribuir Viatura a Outro Militar</span>
           </h2>
+          <p className="text-xs text-slate-400">
+            Quem deixa de conduzir pode transferir a viatura a outra pessoa. A marcha atual é encerrada e abre-se automaticamente uma nova em nome do novo condutor.
+          </p>
 
           <div className="space-y-3 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">NIP do Novo Condutor *</label>
-                <input
-                  type="text"
-                  required
-                  value={profile.nip}
-                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                  placeholder="Ex: 128912-B"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
-                />
-              </div>
-
               <div>
                 <label className="block text-slate-400 mb-1 font-semibold">Trigrama ou Posto e Nome do Novo Condutor *</label>
                 <input
@@ -847,6 +888,18 @@ export default function ChavePage() {
                   value={profile.trigramaOuCondutor || ''}
                   onChange={(e) => setProfile({ ...profile, trigramaOuCondutor: e.target.value })}
                   placeholder="Ex: FER ou Sargento Ferreira"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">NIP do Novo Condutor (Opcional)</label>
+                <input
+                  type="text"
+                  value={profile.nip || ''}
+                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  placeholder="Ex: 128912-B (Opcional)"
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
                 />
               </div>
@@ -867,10 +920,10 @@ export default function ChavePage() {
 
           <button
             onClick={handleAlternarCondutor}
-            className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-blue-950 flex items-center justify-center space-x-2 transition-all"
+            className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-blue-950 flex items-center justify-center space-x-2 transition-all"
           >
             <RefreshCcw className="w-4 h-4" />
-            <span>Assumir Condução da Viatura</span>
+            <span>Transferir & Atribuir Viatura ao Novo Condutor</span>
           </button>
         </div>
       )}
@@ -886,19 +939,6 @@ export default function ChavePage() {
           <div className="space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">NIP de quem entrega a chave *</label>
-                <input
-                  type="text"
-                  required
-                  value={profile.nip}
-                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                  placeholder="Ex: 134890-A"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
-                />
-              </div>
-
-              <div>
                 <label className="block text-slate-400 mb-1 font-semibold">Trigrama ou Posto e Nome *</label>
                 <input
                   type="text"
@@ -906,6 +946,18 @@ export default function ChavePage() {
                   value={profile.trigramaOuCondutor || ''}
                   onChange={(e) => setProfile({ ...profile, trigramaOuCondutor: e.target.value })}
                   placeholder="Ex: OLV ou Tenente Oliveira"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">NIP de quem entrega (Opcional)</label>
+                <input
+                  type="text"
+                  value={profile.nip || ''}
+                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  placeholder="Ex: 134890-A (Opcional)"
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
                 />
               </div>
