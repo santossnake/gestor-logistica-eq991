@@ -372,8 +372,8 @@ export default function ChavePage() {
     }
   };
 
-  // Handler: Alternar Condutor (Encerra marcha anterior e abre novo levantamento em nome do novo condutor)
-  const handleAlternarCondutor = async () => {
+  // Handler: Alternar Condutor (Suporta Assumir com GPS e Transferir sem GPS)
+  const handleAlternarCondutor = async (isAssumirNoProprioTelemovel: boolean = false) => {
     if (!viatura || !profile.trigramaOuCondutor) {
       setErrorMsg('Por favor introduza o Trigrama / Posto e Nome do novo condutor.');
       return;
@@ -471,7 +471,15 @@ export default function ChavePage() {
         }
       }
 
-      alert(`Troca de condutor registada com sucesso! A marcha anterior foi encerrada e foi criado um novo levantamento em nome de ${profile.trigramaOuCondutor} (NIP: ${nipVal}).`);
+      // 4. CONTROLO DO GPS TRACKING NESTE TELEMÓVEL
+      if (isAssumirNoProprioTelemovel) {
+        setIsGpsTrackingActive(true);
+        alert(`🖐️ Condução assumida com sucesso! A marcha foi iniciada em nome de ${profile.trigramaOuCondutor} e o rastreio GPS ficou ATIVO neste telemóvel.`);
+      } else {
+        setIsGpsTrackingActive(false);
+        alert(`🔄 Viatura transferida com sucesso para ${profile.trigramaOuCondutor}! A nova marcha ficou registada e o rastreio GPS neste dispositivo foi DESATIVADO.`);
+      }
+
       setActiveTab('FINALIZAR');
     } catch (err: any) {
       console.error(err);
@@ -918,13 +926,25 @@ export default function ChavePage() {
             </div>
           </div>
 
-          <button
-            onClick={handleAlternarCondutor}
-            className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-blue-950 flex items-center justify-center space-x-2 transition-all"
-          >
-            <RefreshCcw className="w-4 h-4" />
-            <span>Transferir & Atribuir Viatura ao Novo Condutor</span>
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => handleAlternarCondutor(true)}
+              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-950/80 flex items-center justify-center space-x-2 transition-all"
+            >
+              <Play className="w-4 h-4 fill-white" />
+              <span>🖐️ Assumir Condução (Ativar GPS neste tlmv)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleAlternarCondutor(false)}
+              className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-blue-950/80 flex items-center justify-center space-x-2 transition-all"
+            >
+              <RefreshCcw className="w-4 h-4" />
+              <span>🔄 Transferir Viatura (Desativar GPS neste tlmv)</span>
+            </button>
+          </div>
         </div>
       )}
 
