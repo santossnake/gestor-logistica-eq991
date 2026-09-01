@@ -630,9 +630,15 @@ export default function EmprestimosPage() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
 
-                      <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-purple-950 text-purple-300 border border-purple-800">
-                        {emp.estado}
-                      </span>
+                      {emp.estado === 'ATIVO' && new Date() > new Date(emp.data_fim_prevista) ? (
+                        <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-rose-950 text-rose-300 border border-rose-800 animate-pulse">
+                          🚨 EM ATRASO
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-purple-950 text-purple-300 border border-purple-800">
+                          {emp.estado}
+                        </span>
+                      )}
                     </div>
                   </div>
 

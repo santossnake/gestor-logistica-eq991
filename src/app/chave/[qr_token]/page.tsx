@@ -28,8 +28,8 @@ import {
   Building2,
   LocateFixed
 } from 'lucide-react';
-import { getStoredMilitaryProfile, saveMilitaryProfile, saveFleetOverride, getFleetOverrides, getStoredLocais, getStoredMarchas, saveStoredMarchas, MilitaryProfile } from '@/lib/utils/cookies';
-import { supabase, isSupabaseConfigured, Viatura, LocalItem, RegistoMarcha } from '@/lib/supabase/client';
+import { getStoredMilitaryProfile, saveMilitaryProfile, saveFleetOverride, getFleetOverrides, getStoredLocais, getStoredMarchas, saveStoredMarchas, getStoredEmprestimos, MilitaryProfile } from '@/lib/utils/cookies';
+import { supabase, isSupabaseConfigured, Viatura, LocalItem, RegistoMarcha, EmprestimoExterno } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_LOCAIS, MOCK_MARCHAS } from '@/lib/mock-data';
 import { LiveGpsTracker } from '@/components/LiveGpsTracker';
 
@@ -144,6 +144,35 @@ export default function ChavePage() {
         }
 
         const targetV = vData || initialV;
+
+        // Check if there is an active external loan for this vehicle
+        const { data: eData } = await supabase
+          .from('emprestimos_externos')
+          .select('*')
+          .eq('viatura_id', targetV.id);
+
+        const localEmp = getStoredEmprestimos().filter((e) => e.viatura_id === targetV.id);
+        const remoteEmp = eData || [];
+        const empMap = new Map<string, EmprestimoExterno>();
+        remoteEmp.forEach((e) => empMap.set(e.id, e));
+        localEmp.forEach((e) => {
+          if (!empMap.has(e.id)) empMap.set(e.id, e);
+        });
+
+        const activeLoan = Array.from(empMap.values()).find(
+          (e) => (e.estado === 'ATIVO' || (e as any).estado === 'ATIVO') && !e.data_devolucao_real
+        );
+
+        if (activeLoan) {
+          const isOverdue = new Date() > new Date(activeLoan.data_fim_prevista);
+          setViatura({
+            ...targetV,
+            estado: 'EMPRESTADA_EXTERNO',
+            _activeLoan: activeLoan,
+            _isLoanOverdue: isOverdue
+          } as any);
+        }
+
         const { data: mData } = await supabase
           .from('registos_marcha')
           .select('*')

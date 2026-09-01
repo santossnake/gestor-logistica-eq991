@@ -25,9 +25,9 @@ import {
   Wrench,
   RotateCcw
 } from 'lucide-react';
-import { supabase, isSupabaseConfigured, Viatura, HistoricoGps, RegistoAbastecimento, RegistoMarcha } from '@/lib/supabase/client';
+import { supabase, isSupabaseConfigured, Viatura, HistoricoGps, RegistoAbastecimento, RegistoMarcha, EmprestimoExterno } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_GPS, MOCK_LOCAIS, MOCK_MARCHAS } from '@/lib/mock-data';
-import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride, getStoredLocais, saveStoredLocais, logAuditAction } from '@/lib/utils/cookies';
+import { getStoredMilitaryProfile, getFleetOverrides, saveFleetOverride, getStoredLocais, saveStoredLocais, logAuditAction, getStoredEmprestimos } from '@/lib/utils/cookies';
 
 const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false });
 
@@ -143,10 +143,40 @@ export default function AdminViaturasPage() {
         setDbLocais(rawLocs.filter((l: any) => l.is_ativo !== false));
 
         const { data: vData } = await supabase.from('viaturas').select('*').order('matricula', { ascending: true });
-        if (vData && vData.length > 0) {
-          const sanitized = vData.map((v) => sanitizeViaturaKm(v));
-          setViaturas(sanitized);
-        }
+        const { data: eData } = await supabase.from('emprestimos_externos').select('*').order('created_at', { ascending: false });
+
+        const remoteEmp = eData || [];
+        const localEmp = getStoredEmprestimos();
+        const empMap = new Map<string, EmprestimoExterno>();
+        remoteEmp.forEach((emp) => empMap.set(emp.id, emp));
+        localEmp.forEach((emp) => {
+          if (!empMap.has(emp.id)) {
+            empMap.set(emp.id, emp);
+          }
+        });
+        const mergedEmp = Array.from(empMap.values());
+
+        const baseVData = (vData && vData.length > 0) ? vData : MOCK_VIATURAS;
+        const sanitized = baseVData.map((v) => {
+          const s = sanitizeViaturaKm(v);
+          const activeEmp = mergedEmp.find(
+            (e) => e.viatura_id === v.id && (e.estado === 'ATIVO' || (e as any).estado === 'ATIVO') && !e.data_devolucao_real
+          );
+
+          if (activeEmp) {
+            const isOverdue = new Date() > new Date(activeEmp.data_fim_prevista);
+            return {
+              ...s,
+              estado: 'EMPRESTADA_EXTERNO',
+              _activeLoan: activeEmp,
+              _isLoanOverdue: isOverdue
+            } as any;
+          }
+
+          return s;
+        });
+
+        setViaturas(sanitized);
 
         const { data: mData } = await supabase.from('registos_marcha').select('*').order('data_saida', { ascending: false });
         if (mData && mData.length > 0) {
@@ -708,6 +738,44 @@ export default function AdminViaturasPage() {
                         <span className="text-slate-400">Destino / Função:</span>
                         <span className="font-bold text-emerald-300 truncate max-w-[150px]">{activeMarcha?.destino_funcao || 'Serviço Geral'}</span>
                       </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ACTIVE EXTERNAL LOAN BANNER (NORMAL OR OVERDUE) */}
+                {(v.estado === 'EMPRESTADA_EXTERNO' || (v as any)._activeLoan) && (() => {
+                  const emp = (v as any)._activeLoan;
+                  const isOverdue = (v as any)._isLoanOverdue || (emp && new Date() > new Date(emp.data_fim_prevista));
+
+                  return (
+                    <div className={`p-3 rounded-xl border text-xs font-mono space-y-1 shadow-md ${
+                      isOverdue
+                        ? 'bg-rose-950/90 border-rose-500/80 text-rose-200 animate-pulse'
+                        : 'bg-purple-950/90 border-purple-500/60 text-purple-200'
+                    }`}>
+                      <div className="flex items-center justify-between font-bold border-b pb-1 border-purple-800/80">
+                        <span className="flex items-center space-x-1">
+                          <Building2 className="w-3.5 h-3.5 text-purple-400" />
+                          <span>{isOverdue ? '🚨 CEDÊNCIA EXTERNA EM ATRASO!' : '🏢 CEDÊNCIA EXTERNA ATIVA'}</span>
+                        </span>
+                        {emp?.data_fim_prevista && (
+                          <span className={`text-[10px] ${isOverdue ? 'text-rose-300 font-bold' : 'text-purple-300'}`}>
+                            Devolução: {new Date(emp.data_fim_prevista).toLocaleDateString('pt-PT')}
+                          </span>
+                        )}
+                      </div>
+                      {emp && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Entidade:</span>
+                            <span className="font-bold text-white">{emp.entidade_externa}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Responsável:</span>
+                            <span className="text-slate-200">{emp.nome_responsavel} ({emp.contacto_responsavel})</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 })()}

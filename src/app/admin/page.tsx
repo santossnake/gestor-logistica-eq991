@@ -23,15 +23,16 @@ import {
   Truck,
   Mail
 } from 'lucide-react';
-import { supabase, Viatura, Pedido } from '@/lib/supabase/client';
+import { supabase, Viatura, Pedido, EmprestimoExterno } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_PEDIDOS } from '@/lib/mock-data';
-import { getStoredPedidos, saveFleetOverride, saveStoredPedido, updateStoredPedido, deleteStoredPedido, isReservationOverlapping, logAuditAction } from '@/lib/utils/cookies';
+import { getStoredPedidos, saveFleetOverride, saveStoredPedido, updateStoredPedido, deleteStoredPedido, isReservationOverlapping, logAuditAction, getStoredEmprestimos } from '@/lib/utils/cookies';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
 export default function AdminDashboardPage() {
   const [viaturas, setViaturas] = useState<Viatura[]>(MOCK_VIATURAS);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [emprestimos, setEmprestimos] = useState<EmprestimoExterno[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Approval Modal state
@@ -59,6 +60,7 @@ export default function AdminDashboardPage() {
       try {
         const { data: vData } = await supabase.from('viaturas').select('*');
         const { data: pData } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
+        const { data: eData } = await supabase.from('emprestimos_externos').select('*').order('created_at', { ascending: false });
 
         const localStored = getStoredPedidos();
         const dbPedidos: Pedido[] = pData || [];
@@ -71,9 +73,37 @@ export default function AdminDashboardPage() {
           }
         }
 
+        // Merge external loans from Supabase and local storage
+        const remoteEmp = eData || [];
+        const localEmp = getStoredEmprestimos();
+        const empMap = new Map<string, EmprestimoExterno>();
+        remoteEmp.forEach((emp) => empMap.set(emp.id, emp));
+        localEmp.forEach((emp) => {
+          if (!empMap.has(emp.id)) {
+            empMap.set(emp.id, emp);
+          }
+        });
+        const mergedEmp = Array.from(empMap.values());
+
         let fleet = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
         fleet = fleet.map((v) => {
           const sanitized = sanitizeViaturaKm(v);
+
+          // Check if vehicle has an active external loan
+          const activeEmp = mergedEmp.find(
+            (e) => e.viatura_id === v.id && (e.estado === 'ATIVO' || (e as any).estado === 'ATIVO') && !e.data_devolucao_real
+          );
+
+          if (activeEmp) {
+            const isOverdue = new Date() > new Date(activeEmp.data_fim_prevista);
+            return {
+              ...sanitized,
+              estado: 'EMPRESTADA_EXTERNO',
+              _activeLoan: activeEmp,
+              _isLoanOverdue: isOverdue
+            } as any;
+          }
+
           const hasApprovedBooking = combined.some(
             (p) => p.viatura_id === v.id && p.estado_pedido === 'APROVADO'
           );
@@ -85,6 +115,7 @@ export default function AdminDashboardPage() {
 
         setViaturas(fleet);
         setPedidos(combined);
+        setEmprestimos(mergedEmp);
 
         if (fleet.length > 0) {
           setSelectedViaturaIdForApproval(fleet[0].id);
@@ -244,6 +275,38 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* OVERDUE EXTERNAL LOANS ALERT BANNERS */}
+      {viaturas.filter((v: any) => v._activeLoan && v._isLoanOverdue).map((v: any) => {
+        const emp = v._activeLoan;
+        return (
+          <div key={emp.id} className="p-4 rounded-2xl bg-rose-950/90 border border-rose-500/80 text-rose-200 text-xs font-mono space-y-2 shadow-xl animate-pulse">
+            <div className="flex items-center justify-between font-bold text-rose-300 border-b border-rose-800 pb-1">
+              <span className="flex items-center space-x-2 text-sm">
+                <AlertTriangle className="w-5 h-5 text-rose-400" />
+                <span>🚨 ALERTA: CEDÊNCIA EXTERNA EM ATRASO — {emp.entidade_externa}</span>
+              </span>
+              <span className="px-2.5 py-0.5 rounded bg-rose-900 text-white font-mono text-[10px] font-bold uppercase">
+                Prazo de Devolução Expirado
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <span className="text-slate-400 block text-[10px]">VIATURA CEDIDA:</span>
+                <strong className="text-white text-sm">{v.matricula} ({v.modelo})</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">RESPONSÁVEL EXTERNO:</span>
+                <span className="text-white font-bold">{emp.nome_responsavel} ({emp.contacto_responsavel})</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">DATA/HORA LIMITE DEVOLUÇÃO:</span>
+                <strong className="text-rose-300 font-bold">{new Date(emp.data_fim_prevista).toLocaleString('pt-PT')}</strong>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
       {/* Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="p-4 rounded-xl glass-card border border-emerald-500/30">
