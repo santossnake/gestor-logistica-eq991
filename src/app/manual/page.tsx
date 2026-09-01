@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   BookOpen,
   Car,
@@ -26,7 +27,10 @@ import {
 } from 'lucide-react';
 import { getStoredMilitaryProfile } from '@/lib/utils/cookies';
 
-export default function ManualPage() {
+function ManualContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+
   const [activeTab, setActiveTab] = useState<'CONDUTOR' | 'BACKOFFICE'>('CONDUTOR');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
 
@@ -35,10 +39,17 @@ export default function ManualPage() {
       const auth = localStorage.getItem('eq991_admin_auth');
       if (auth === 'true') {
         setIsAdminLoggedIn(true);
-        setActiveTab('BACKOFFICE');
       }
     }
-  }, []);
+
+    if (tabParam === 'backoffice') {
+      setActiveTab('BACKOFFICE');
+    } else if (tabParam === 'condutor') {
+      setActiveTab('CONDUTOR');
+    } else if (typeof window !== 'undefined' && localStorage.getItem('eq991_admin_auth') === 'true') {
+      setActiveTab('BACKOFFICE');
+    }
+  }, [tabParam]);
 
   const handlePrint = () => {
     if (typeof window !== 'undefined') {
@@ -404,5 +415,13 @@ export default function ManualPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ManualPage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-xs font-mono text-slate-400">A carregar Manual do Utilizador...</div>}>
+      <ManualContent />
+    </Suspense>
   );
 }

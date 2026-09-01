@@ -8,9 +8,13 @@ import { getStoredMilitaryProfile, MilitaryProfile } from '@/lib/utils/cookies';
 export function Navbar() {
   const [profile, setProfile] = useState<MilitaryProfile>({ nip: '', nome: '', posto: '', email: '' });
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
 
   useEffect(() => {
     setProfile(getStoredMilitaryProfile());
+    if (typeof window !== 'undefined') {
+      setIsAdminLoggedIn(localStorage.getItem('eq991_admin_auth') === 'true');
+    }
   }, []);
 
   return (
@@ -47,13 +51,25 @@ export function Navbar() {
               <Calendar className="w-4 h-4 text-emerald-400" />
               <span>Pedir Viatura</span>
             </Link>
+
             <Link
-              href="/manual"
+              href="/manual?tab=condutor"
               className="px-3 py-2 rounded-md text-sm font-medium text-purple-300 hover:text-purple-200 hover:bg-purple-950/60 flex items-center space-x-2 transition-colors border border-purple-500/30 rounded-lg"
             >
               <BookOpen className="w-4 h-4 text-purple-400" />
               <span>📘 Manual</span>
             </Link>
+
+            {isAdminLoggedIn && (
+              <Link
+                href="/manual?tab=backoffice"
+                className="px-3 py-2 rounded-md text-sm font-medium text-indigo-300 hover:text-indigo-200 hover:bg-indigo-950/60 flex items-center space-x-2 transition-colors border border-indigo-500/30 rounded-lg"
+              >
+                <Shield className="w-4 h-4 text-indigo-400" />
+                <span>🛡️ Manual Backoffice</span>
+              </Link>
+            )}
+
             <Link
               href="/admin"
               className="px-3 py-2 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center space-x-2 transition-colors"
@@ -123,13 +139,35 @@ export function Navbar() {
             </Link>
 
             <Link
-              href="/manual"
+              href="/chave/AM-96-11"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full px-4 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-100 text-sm font-semibold flex items-center space-x-3 border border-slate-800 transition-colors"
+            >
+              <Car className="w-5 h-5 text-amber-400" />
+              <span>Abrir Chave de Viatura</span>
+            </Link>
+
+            {/* Manual do Utilizador (Disponível para todos os utilizadores) */}
+            <Link
+              href="/manual?tab=condutor"
               onClick={() => setMobileMenuOpen(false)}
               className="w-full px-4 py-3 rounded-xl bg-purple-950/60 hover:bg-purple-900 text-purple-200 text-sm font-semibold flex items-center space-x-3 border border-purple-500/40 transition-colors"
             >
               <BookOpen className="w-5 h-5 text-purple-400" />
-              <span>📘 Manual do Utilizador / Backoffice</span>
+              <span>📘 Manual do Utilizador</span>
             </Link>
+
+            {/* Manual do Backoffice (Disponível apenas para utilizadores da Logística) */}
+            {isAdminLoggedIn && (
+              <Link
+                href="/manual?tab=backoffice"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full px-4 py-3 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 text-indigo-200 text-sm font-semibold flex items-center space-x-3 border border-indigo-500/40 transition-colors"
+              >
+                <Shield className="w-5 h-5 text-indigo-400" />
+                <span>🛡️ Manual do Backoffice</span>
+              </Link>
+            )}
 
             <Link
               href="/admin"
