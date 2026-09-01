@@ -62,9 +62,10 @@ export default function ChavePage() {
   const [profile, setProfile] = useState<MilitaryProfile>({ nip: '', nome: '', posto: 'Tenente', email: '' });
   const [isGpsTrackingActive, setIsGpsTrackingActive] = useState<boolean>(false);
 
-  // Form states for Início de Marcha
+  // Form states for Início / Troca de Marcha
   const [kmInicialInput, setKmInicialInput] = useState<number>(initialV.km_atuais);
   const [isAtribuicaoModo, setIsAtribuicaoModo] = useState<boolean>(false);
+  const [condutorQueEntrega, setCondutorQueEntrega] = useState<string>('');
 
   // Form states for Finalizar Marcha
   const [kmFinalInput, setKmFinalInput] = useState<number>(initialV.km_atuais);
@@ -388,9 +389,10 @@ export default function ChavePage() {
     try {
       // 1. FECHO DA MARCHA ANTERIOR (Grava registo de devolução/entrega)
       if (marchaAtiva) {
+        const entregouVal = condutorQueEntrega && condutorQueEntrega.trim() ? condutorQueEntrega.trim() : (marchaAtiva.trigrama_ou_condutor_inicio || profile.trigramaOuCondutor);
         const updatePayload = {
           nip_fim: nipVal,
-          trigrama_ou_condutor_fim: profile.trigramaOuCondutor,
+          trigrama_ou_condutor_fim: entregouVal,
           km_final: currentKm,
           localizacao_chave: viatura.localizacao_atual_chave || 'Em Troca de Serviço',
           localizacao_viatura: viatura.localizacao_atual_viatura || 'Em Troca de Serviço',
@@ -887,16 +889,30 @@ export default function ChavePage() {
           </p>
 
           <div className="space-y-3 text-xs">
+            {/* Campo Opcional: Quem entrega a viatura caso o condutor anterior não tenha usado a aplicação */}
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">
+                Militar que Entrega / Deixa a Viatura (Opcional - caso o anterior não tenha registado)
+              </label>
+              <input
+                type="text"
+                value={condutorQueEntrega}
+                onChange={(e) => setCondutorQueEntrega(e.target.value)}
+                placeholder={marchaAtiva?.trigrama_ou_condutor_inicio ? `Atual: ${marchaAtiva.trigrama_ou_condutor_inicio} (ou indique quem entrega)` : "Ex: OLV ou Tenente Oliveira"}
+                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+              />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Trigrama ou Posto e Nome do Novo Condutor *</label>
+                <label className="block text-slate-400 mb-1 font-semibold">Trigrama ou Posto e Nome do NOVO Condutor *</label>
                 <input
                   type="text"
                   required
                   value={profile.trigramaOuCondutor || ''}
                   onChange={(e) => setProfile({ ...profile, trigramaOuCondutor: e.target.value })}
-                  placeholder="Ex: FER ou Sargento Ferreira"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+                  placeholder="Ex: LAI ou Sargento Laires"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono font-bold text-emerald-300"
                 />
               </div>
 
@@ -920,7 +936,7 @@ export default function ChavePage() {
                 required
                 value={profile.destinoFuncao || ''}
                 onChange={(e) => setProfile({ ...profile, destinoFuncao: e.target.value })}
-                placeholder="Ex: Retorno a Ota / Apoio Logístico"
+                placeholder="Ex: Pista / Serviço Geral"
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
               />
             </div>
