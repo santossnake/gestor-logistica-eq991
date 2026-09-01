@@ -8,7 +8,6 @@ import {
   Car,
   Shield,
   Printer,
-  Download,
   CheckCircle2,
   AlertTriangle,
   Play,
@@ -23,11 +22,8 @@ import {
   MapPin,
   UserCheck,
   ArrowLeft,
-  FileText,
-  Loader2
+  FileText
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { getStoredMilitaryProfile } from '@/lib/utils/cookies';
 
 function ManualContent() {
@@ -36,7 +32,6 @@ function ManualContent() {
 
   const [activeTab, setActiveTab] = useState<'CONDUTOR' | 'BACKOFFICE'>('CONDUTOR');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -58,59 +53,6 @@ function ManualContent() {
   const handlePrint = () => {
     if (typeof window !== 'undefined') {
       window.print();
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    const element = document.getElementById('manual-content-document');
-    if (!element) return;
-
-    setIsGeneratingPdf(true);
-
-    try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#020617',
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-      }
-
-      const fileName = activeTab === 'BACKOFFICE'
-        ? 'Manual_de_Backoffice_e_Logistica_Esquadra_991.pdf'
-        : 'Manual_do_Condutor_Esquadra_991.pdf';
-
-      pdf.save(fileName);
-    } catch (err) {
-      console.error('Erro ao gerar PDF:', err);
-      alert('Erro ao gerar o ficheiro PDF.');
-    } finally {
-      setIsGeneratingPdf(false);
     }
   };
 
@@ -144,28 +86,10 @@ function ManualContent() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handlePrint}
-            className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 flex items-center space-x-2 shadow transition-colors"
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider flex items-center space-x-2 shadow-lg shadow-emerald-950 transition-colors"
           >
-            <Printer className="w-4 h-4 text-emerald-400" />
-            <span>Imprimir / PDF</span>
-          </button>
-
-          <button
-            onClick={handleDownloadPdf}
-            disabled={isGeneratingPdf}
-            className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider shadow-lg flex items-center space-x-2 transition-all"
-          >
-            {isGeneratingPdf ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>A Gerar PDF...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                <span>Descarregar PDF Oficial</span>
-              </>
-            )}
+            <Printer className="w-4 h-4" />
+            <span>🖨️ Imprimir / Guardar em PDF</span>
           </button>
         </div>
       </div>
