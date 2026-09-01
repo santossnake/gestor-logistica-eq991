@@ -23,8 +23,11 @@ import {
   MapPin,
   UserCheck,
   ArrowLeft,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { getStoredMilitaryProfile } from '@/lib/utils/cookies';
 
 function ManualContent() {
@@ -33,6 +36,7 @@ function ManualContent() {
 
   const [activeTab, setActiveTab] = useState<'CONDUTOR' | 'BACKOFFICE'>('CONDUTOR');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -57,41 +61,57 @@ function ManualContent() {
     }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     const element = document.getElementById('manual-content-document');
     if (!element) return;
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="pt">
-      <head>
-        <meta charset="UTF-8">
-        <title>Manual_Utilizacao_Gestor_Logistica_EQ991.html</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #1e293b; background: #fff; line-height: 1.6; }
-          h1 { color: #0284c7; border-bottom: 2px solid #0284c7; padding-bottom: 8px; }
-          h2 { color: #334155; margin-top: 24px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
-          .badge { background: #e0f2fe; color: #0369a1; font-weight: bold; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
-          .alert { background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px; margin: 16px 0; }
-          .tip { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 12px; margin: 16px 0; }
-          table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-          th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
-          th { background: #f8fafc; }
-        </style>
-      </head>
-      <body>
-        ${element.innerHTML}
-      </body>
-      </html>
-    `;
+    setIsGeneratingPdf(true);
 
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Manual_Utilizacao_Gestor_Logistica_EQ991_${activeTab}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#020617',
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      const fileName = activeTab === 'BACKOFFICE'
+        ? 'Manual_de_Backoffice_e_Logistica_Esquadra_991.pdf'
+        : 'Manual_do_Condutor_Esquadra_991.pdf';
+
+      pdf.save(fileName);
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err);
+      alert('Erro ao gerar o ficheiro PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   return (
@@ -132,10 +152,20 @@ function ManualContent() {
 
           <button
             onClick={handleDownloadPdf}
-            className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg flex items-center space-x-2 transition-all"
+            disabled={isGeneratingPdf}
+            className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider shadow-lg flex items-center space-x-2 transition-all"
           >
-            <Download className="w-4 h-4" />
-            <span>Descarregar Manual</span>
+            {isGeneratingPdf ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>A Gerar PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>Descarregar PDF Oficial</span>
+              </>
+            )}
           </button>
         </div>
       </div>
