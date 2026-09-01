@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Shield, Car, Calendar, MapPin, User, Lock, Radio, Menu, X, Smartphone, Home } from 'lucide-react';
+import { Shield, Car, Calendar, MapPin, User, Lock, Radio, Menu, X, Smartphone, Home, BookOpen } from 'lucide-react';
 import { getStoredMilitaryProfile, MilitaryProfile } from '@/lib/utils/cookies';
 
 export function Navbar() {
@@ -46,6 +46,13 @@ export function Navbar() {
             >
               <Calendar className="w-4 h-4 text-emerald-400" />
               <span>Pedir Viatura</span>
+            </Link>
+            <Link
+              href="/manual"
+              className="px-3 py-2 rounded-md text-sm font-medium text-purple-300 hover:text-purple-200 hover:bg-purple-950/60 flex items-center space-x-2 transition-colors border border-purple-500/30 rounded-lg"
+            >
+              <BookOpen className="w-4 h-4 text-purple-400" />
+              <span>📘 Manual</span>
             </Link>
             <Link
               href="/admin"
@@ -116,12 +123,12 @@ export function Navbar() {
             </Link>
 
             <Link
-              href="/chave/AM-96-11"
+              href="/manual"
               onClick={() => setMobileMenuOpen(false)}
-              className="w-full px-4 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-100 text-sm font-semibold flex items-center space-x-3 border border-slate-800 transition-colors"
+              className="w-full px-4 py-3 rounded-xl bg-purple-950/60 hover:bg-purple-900 text-purple-200 text-sm font-semibold flex items-center space-x-3 border border-purple-500/40 transition-colors"
             >
-              <Car className="w-5 h-5 text-amber-400" />
-              <span>Abrir Chave de Viatura</span>
+              <BookOpen className="w-5 h-5 text-purple-400" />
+              <span>📘 Manual do Utilizador / Backoffice</span>
             </Link>
 
             <Link
