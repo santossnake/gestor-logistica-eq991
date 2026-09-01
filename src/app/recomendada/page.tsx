@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Car, Sparkles, CheckCircle2, ShieldAlert, Wrench, Sparkle, ArrowRight, Truck, Info, Wifi } from 'lucide-react';
-import { supabase, Viatura, Anomalia } from '@/lib/supabase/client';
+import { Car, Sparkles, CheckCircle2, ShieldAlert, Wrench, Sparkle, ArrowRight, Truck, Info, Wifi, Building } from 'lucide-react';
+import { supabase, Viatura, Anomalia, EmprestimoExterno } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_ANOMALIAS } from '@/lib/mock-data';
-import { getFleetOverrides } from '@/lib/utils/cookies';
+import { getFleetOverrides, getStoredEmprestimos } from '@/lib/utils/cookies';
 import { NfcScanner } from '@/components/NfcScanner';
 
 export default function RecomendadaPage() {
@@ -26,6 +26,7 @@ export default function RecomendadaPage() {
 
   const [viaturas, setViaturas] = useState<Viatura[]>(initialFleet);
   const [anomalias, setAnomalias] = useState<Anomalia[]>(initialAnomalies);
+  const [emprestimos, setEmprestimos] = useState<EmprestimoExterno[]>([]);
   const [recomendada, setRecomendada] = useState<Viatura | null>(initialRec);
   const [selectedViatura, setSelectedViatura] = useState<Viatura | null>(initialRec);
   const [showNfcScanner, setShowNfcScanner] = useState<boolean>(false);
@@ -38,12 +39,37 @@ export default function RecomendadaPage() {
         const { data: vData } = await supabase.from('viaturas').select('*');
         const { data: aData } = await supabase.from('anomalias').select('*');
         const { data: pData } = await supabase.from('pedidos').select('*');
+        const { data: eData } = await supabase.from('emprestimos_externos').select('*').order('created_at', { ascending: false });
 
         const dbPedidos = pData || [];
+        const remoteEmp = eData || [];
+        const localEmp = getStoredEmprestimos();
+        const empMap = new Map<string, EmprestimoExterno>();
+        remoteEmp.forEach((emp) => empMap.set(emp.id, emp));
+        localEmp.forEach((emp) => {
+          if (!empMap.has(emp.id)) empMap.set(emp.id, emp);
+        });
+        const mergedEmp = Array.from(empMap.values());
+        setEmprestimos(mergedEmp);
 
         let fleet: Viatura[] = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
         fleet = fleet.map((v) => {
           const sanitized = sanitizeViaturaKm(localOverrides[v.id] ? { ...v, ...localOverrides[v.id] } : v);
+
+          const activeEmp = mergedEmp.find(
+            (e) => e.viatura_id === v.id && (e.estado === 'ATIVO' || (e as any).estado === 'ATIVO') && !e.data_devolucao_real
+          );
+
+          if (activeEmp) {
+            const isOverdue = new Date() > new Date(activeEmp.data_fim_prevista);
+            return {
+              ...sanitized,
+              estado: 'EMPRESTADA_EXTERNO',
+              _activeLoan: activeEmp,
+              _isLoanOverdue: isOverdue
+            } as any;
+          }
+
           const hasApprovedBooking = dbPedidos.some(
             (p: any) => p.viatura_id === v.id && p.estado_pedido === 'APROVADO'
           );
@@ -174,6 +200,44 @@ export default function RecomendadaPage() {
             </span>
           </div>
 
+          {/* ACTIVE EXTERNAL LOAN WARNING BANNER IN SPOTLIGHT */}
+          {(activeViatura.estado === 'EMPRESTADA_EXTERNO' || (activeViatura as any)._activeLoan) && (() => {
+            const emp = (activeViatura as any)._activeLoan;
+            const isOverdue = (activeViatura as any)._isLoanOverdue || (emp && new Date() > new Date(emp.data_fim_prevista));
+
+            return (
+              <div className={`p-4 rounded-xl border text-xs font-mono space-y-2 shadow-lg ${
+                isOverdue
+                  ? 'bg-rose-950/90 border-rose-500/80 text-rose-200 animate-pulse'
+                  : 'bg-purple-950/90 border-purple-500/60 text-purple-200'
+              }`}>
+                <div className="flex items-center justify-between font-bold border-b pb-1.5 border-purple-800">
+                  <span className="flex items-center space-x-1.5 text-sm">
+                    <Building className="w-4 h-4 text-purple-400" />
+                    <span>{isOverdue ? '🚨 CEDÊNCIA EXTERNA EM ATRASO!' : '🏢 VIATURA EM CEDÊNCIA EXTERNA'}</span>
+                  </span>
+                  {emp?.data_fim_prevista && (
+                    <span className={`text-[11px] ${isOverdue ? 'text-rose-300 font-bold' : 'text-purple-300'}`}>
+                      Prazo: {new Date(emp.data_fim_prevista).toLocaleString('pt-PT')}
+                    </span>
+                  )}
+                </div>
+                {emp && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">ENTIDADE RECETORA:</span>
+                      <strong className="text-white">{emp.entidade_externa}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">RESPONSÁVEL:</span>
+                      <span className="text-slate-200">{emp.nome_responsavel} ({emp.contacto_responsavel})</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Details Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
             <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
@@ -185,9 +249,17 @@ export default function RecomendadaPage() {
 
             <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
               <span className="text-slate-500 block">ESTADO DA FROTA</span>
-              <span className="text-emerald-400 font-bold text-sm flex items-center space-x-1">
+              <span className={`font-bold text-sm flex items-center space-x-1 ${
+                activeViatura.estado === 'EMPRESTADA_EXTERNO'
+                  ? (activeViatura as any)._isLoanOverdue ? 'text-rose-400' : 'text-purple-400'
+                  : 'text-emerald-400'
+              }`}>
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{activeViatura.estado}</span>
+                <span>
+                  {activeViatura.estado === 'EMPRESTADA_EXTERNO'
+                    ? (activeViatura as any)._isLoanOverdue ? 'EMPRESTADA (EM ATRASO)' : 'CEDÊNCIA EXTERNA'
+                    : activeViatura.estado}
+                </span>
               </span>
             </div>
 
@@ -262,10 +334,18 @@ export default function RecomendadaPage() {
                         ? 'bg-amber-950 text-amber-300 border border-amber-800'
                         : v.estado === 'EM_USO'
                         ? 'bg-blue-950 text-blue-400 border border-blue-800'
+                        : v.estado === 'EMPRESTADA_EXTERNO'
+                        ? (v as any)._isLoanOverdue
+                          ? 'bg-rose-950 text-rose-300 border border-rose-800 animate-pulse'
+                          : 'bg-purple-950 text-purple-300 border border-purple-800'
                         : 'bg-rose-950 text-rose-400 border border-rose-800'
                     }`}
                   >
-                    {v.estado}
+                    {v.estado === 'EMPRESTADA_EXTERNO'
+                      ? (v as any)._isLoanOverdue
+                        ? 'EMPRESTADA (EM ATRASO)'
+                        : 'CEDÊNCIA EXTERNA'
+                      : v.estado}
                   </span>
                 </div>
 
