@@ -704,11 +704,17 @@ export default function AdminViaturasPage() {
                         : v.estado === 'RESERVADA'
                         ? 'bg-amber-950 text-amber-300 border border-amber-800'
                         : v.estado === 'EM_USO'
-                        ? 'bg-blue-950 text-blue-400 border border-blue-800'
+                        ? 'bg-blue-950 text-blue-300 border border-blue-700'
                         : 'bg-rose-950 text-rose-400 border border-rose-800'
                     }`}
                   >
-                    {v.estado}
+                    {v.estado === 'EM_USO'
+                      ? (() => {
+                          const activeMarcha = marchas.find((m) => m.viatura_id === v.id && !m.data_chegada) || marchas.find((m) => m.viatura_id === v.id);
+                          const cond = activeMarcha?.trigrama_ou_condutor_inicio || activeMarcha?.nip_inicio || null;
+                          return cond ? `EM USO (${cond})` : 'EM_USO';
+                        })()
+                      : v.estado}
                   </span>
                 </div>
 

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Car, Sparkles, CheckCircle2, ShieldAlert, Wrench, Sparkle, ArrowRight, Truck, Info, Wifi, Building } from 'lucide-react';
 import { supabase, Viatura, Anomalia, EmprestimoExterno } from '@/lib/supabase/client';
 import { MOCK_VIATURAS, MOCK_ANOMALIAS } from '@/lib/mock-data';
-import { getFleetOverrides, getStoredEmprestimos } from '@/lib/utils/cookies';
+import { getFleetOverrides, getStoredEmprestimos, getStoredMarchas } from '@/lib/utils/cookies';
 import { NfcScanner } from '@/components/NfcScanner';
 
 export default function RecomendadaPage() {
@@ -40,6 +40,7 @@ export default function RecomendadaPage() {
         const { data: aData } = await supabase.from('anomalias').select('*');
         const { data: pData } = await supabase.from('pedidos').select('*');
         const { data: eData } = await supabase.from('emprestimos_externos').select('*').order('created_at', { ascending: false });
+        const { data: mData } = await supabase.from('registos_marcha').select('*').order('data_saida', { ascending: false });
 
         const dbPedidos = pData || [];
         const remoteEmp = eData || [];
@@ -51,6 +52,13 @@ export default function RecomendadaPage() {
         });
         const mergedEmp = Array.from(empMap.values());
         setEmprestimos(mergedEmp);
+
+        // Marchas ativas (para extrair trigrama de quem tem a viatura em uso)
+        const localMarchas = typeof window !== 'undefined' ? getStoredMarchas() : [];
+        const marchasMap = new Map<string, any>();
+        (mData || []).forEach((m) => marchasMap.set(m.id, m));
+        localMarchas.forEach((m: any) => { if (!marchasMap.has(m.id)) marchasMap.set(m.id, m); });
+        const mergedMarchas = Array.from(marchasMap.values());
 
         let fleet: Viatura[] = vData && vData.length > 0 ? vData : MOCK_VIATURAS;
         fleet = fleet.map((v) => {
@@ -70,13 +78,30 @@ export default function RecomendadaPage() {
             } as any;
           }
 
+          // Verificar marcha ativa sem data de chegada
+          const activeMarcha = mergedMarchas.find(
+            (m: any) => m.viatura_id === v.id && (!m.data_chegada || m.data_chegada === '')
+          );
+
+          const condutorAtual = activeMarcha?.trigrama_ou_condutor_inicio || activeMarcha?.nip_inicio || (sanitized as any).condutor_atual || null;
+
+          let estadoFinal = sanitized.estado;
+          if (activeMarcha) {
+            estadoFinal = 'EM_USO';
+          }
+
           const hasApprovedBooking = dbPedidos.some(
             (p: any) => p.viatura_id === v.id && p.estado_pedido === 'APROVADO'
           );
-          if (hasApprovedBooking && sanitized.estado === 'DISPONIVEL') {
-            return { ...sanitized, estado: 'RESERVADA' };
+          if (hasApprovedBooking && estadoFinal === 'DISPONIVEL') {
+            estadoFinal = 'RESERVADA';
           }
-          return sanitized;
+
+          return {
+            ...sanitized,
+            estado: estadoFinal,
+            _condutorAtual: condutorAtual
+          } as any;
         });
 
         const anomalies: Anomalia[] = aData && aData.length > 0 ? aData : MOCK_ANOMALIAS;
@@ -333,7 +358,7 @@ export default function RecomendadaPage() {
                         : v.estado === 'RESERVADA'
                         ? 'bg-amber-950 text-amber-300 border border-amber-800'
                         : v.estado === 'EM_USO'
-                        ? 'bg-blue-950 text-blue-400 border border-blue-800'
+                        ? 'bg-blue-950 text-blue-300 border border-blue-700 font-bold'
                         : v.estado === 'EMPRESTADA_EXTERNO'
                         ? (v as any)._isLoanOverdue
                           ? 'bg-rose-950 text-rose-300 border border-rose-800 animate-pulse'
@@ -345,11 +370,26 @@ export default function RecomendadaPage() {
                       ? (v as any)._isLoanOverdue
                         ? 'EMPRESTADA (EM ATRASO)'
                         : 'CEDÊNCIA EXTERNA'
+                      : v.estado === 'EM_USO' && (v as any)._condutorAtual
+                      ? `EM USO (${(v as any)._condutorAtual})`
                       : v.estado}
                   </span>
                 </div>
 
                 <p className="text-xs font-semibold text-slate-300">{v.modelo}</p>
+
+                {/* Banner de Condutor em Serviço */}
+                {v.estado === 'EM_USO' && (v as any)._condutorAtual && (
+                  <div className="mt-2 p-2 rounded-lg bg-blue-950/90 border border-blue-600/60 text-xs font-mono text-blue-200 flex items-center justify-between shadow-sm">
+                    <span className="text-slate-300 font-semibold flex items-center space-x-1">
+                      <Car className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Em Uso por:</span>
+                    </span>
+                    <span className="font-black text-white bg-blue-600 px-2 py-0.5 rounded uppercase tracking-wider">
+                      {(v as any)._condutorAtual}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono mt-3 pt-2 border-t border-slate-800/80">
                   <span>{v.km_atuais.toLocaleString()} KM</span>
                   <span>{v.num_lugares} Lugares</span>
