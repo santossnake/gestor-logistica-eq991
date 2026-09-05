@@ -364,17 +364,32 @@ export default function ChavePage() {
       const currentMarchas = getStoredMarchas();
       saveStoredMarchas([marchaRec, ...currentMarchas.filter((m: any) => m.id !== marchaRec.id)]);
 
+      const localChaveCondutor = profile.trigramaOuCondutor || 'Militar em Serviço';
+
       if (isSupabaseConfigured()) {
         try {
-          await supabase.from('viaturas').update({ estado: 'EM_USO', km_atuais: kmInicialInput }).eq('id', viatura.id);
+          await supabase.from('viaturas').update({
+            estado: 'EM_USO',
+            km_atuais: kmInicialInput,
+            localizacao_atual_chave: localChaveCondutor
+          }).eq('id', viatura.id);
         } catch (netErr: any) {
           console.warn('Erro de rede ao atualizar estado da viatura no Supabase:', netErr);
         }
       }
 
-      saveFleetOverride(viatura.id, { estado: 'EM_USO', km_atuais: kmInicialInput });
+      saveFleetOverride(viatura.id, {
+        estado: 'EM_USO',
+        km_atuais: kmInicialInput,
+        localizacao_atual_chave: localChaveCondutor
+      });
 
-      setViatura({ ...viatura, estado: 'EM_USO', km_atuais: kmInicialInput });
+      setViatura({
+        ...viatura,
+        estado: 'EM_USO',
+        km_atuais: kmInicialInput,
+        localizacao_atual_chave: localChaveCondutor
+      });
       setIsGpsTrackingActive(true);
       setActiveTab('FINALIZAR');
     } catch (err: any) {
@@ -493,7 +508,31 @@ export default function ChavePage() {
         }
       }
 
-      // 4. CONTROLO DO GPS TRACKING NESTE TELEMÓVEL
+      // 4. ATUALIZAR LOCAL DA CHAVE PARA O NOVO CONDUTOR
+      const localChaveNovoCondutor = profile.trigramaOuCondutor || 'Novo Condutor';
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('viaturas').update({
+            estado: 'EM_USO',
+            localizacao_atual_chave: localChaveNovoCondutor
+          }).eq('id', viatura.id);
+        } catch (netErr: any) {
+          console.warn('Erro de rede ao atualizar localização da chave no Supabase:', netErr);
+        }
+      }
+
+      saveFleetOverride(viatura.id, {
+        estado: 'EM_USO',
+        localizacao_atual_chave: localChaveNovoCondutor
+      });
+
+      setViatura({
+        ...viatura,
+        estado: 'EM_USO',
+        localizacao_atual_chave: localChaveNovoCondutor
+      });
+
+      // 5. CONTROLO DO GPS TRACKING NESTE TELEMÓVEL
       if (isAssumirNoProprioTelemovel) {
         setIsGpsTrackingActive(true);
         alert(`🖐️ Condução assumida com sucesso! A marcha foi iniciada em nome de ${profile.trigramaOuCondutor} e o rastreio GPS ficou ATIVO neste telemóvel.`);

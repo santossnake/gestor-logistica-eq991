@@ -86,8 +86,14 @@ export default function RecomendadaPage() {
           const condutorAtual = activeMarcha?.trigrama_ou_condutor_inicio || activeMarcha?.nip_inicio || (sanitized as any).condutor_atual || null;
 
           let estadoFinal = sanitized.estado;
+          let localChaveFinal = sanitized.localizacao_atual_chave;
+
           if (activeMarcha) {
             estadoFinal = 'EM_USO';
+          }
+
+          if (estadoFinal === 'EM_USO' && condutorAtual) {
+            localChaveFinal = condutorAtual;
           }
 
           const hasApprovedBooking = dbPedidos.some(
@@ -100,6 +106,7 @@ export default function RecomendadaPage() {
           return {
             ...sanitized,
             estado: estadoFinal,
+            localizacao_atual_chave: localChaveFinal,
             _condutorAtual: condutorAtual
           } as any;
         });

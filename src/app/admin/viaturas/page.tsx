@@ -176,14 +176,22 @@ export default function AdminViaturasPage() {
           return s;
         });
 
-        setViaturas(sanitized);
-
         const { data: mData } = await supabase.from('registos_marcha').select('*').order('data_saida', { ascending: false });
-        if (mData && mData.length > 0) {
-          setMarchas(mData);
-        } else {
-          setMarchas(MOCK_MARCHAS);
-        }
+        const marchasList = (mData && mData.length > 0) ? mData : MOCK_MARCHAS;
+        setMarchas(marchasList);
+
+        const updatedFleet = sanitized.map((v) => {
+          const activeMarcha = marchasList.find((m) => m.viatura_id === v.id && !m.data_chegada);
+          if (v.estado === 'EM_USO' || activeMarcha) {
+            const cond = activeMarcha?.trigrama_ou_condutor_inicio || activeMarcha?.nip_inicio;
+            if (cond) {
+              return { ...v, estado: 'EM_USO', localizacao_atual_chave: cond };
+            }
+          }
+          return v;
+        });
+
+        setViaturas(updatedFleet);
 
         const { data: gData } = await supabase.from('historico_posicoes_gps').select('*').order('registado_at', { ascending: false });
         if (gData && gData.length > 0) setTodosPontosGps(gData);
