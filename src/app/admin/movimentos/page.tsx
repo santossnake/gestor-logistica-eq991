@@ -460,11 +460,32 @@ export default function MovimentosViaturasPage() {
                     </div>
 
                     <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 space-y-1">
-                      <span className="text-slate-500 text-[10px] block uppercase">Destino / Função da Missão</span>
-                      <div className="text-emerald-300 font-bold text-sm">
-                        {m.destino_funcao || 'Serviço Geral'}
+                      <span className="text-slate-500 text-[10px] block uppercase font-bold">Destino & Âmbito da Missão</span>
+                      <div className="flex items-center space-x-1.5 flex-wrap">
+                        {((m as any).fora_da_unidade || m.destino_funcao?.includes('[FORA DA UNIDADE]')) ? (
+                          <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold">
+                            🛣️ FORA DA UNIDADE
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-bold">
+                            🏢 INTERNO
+                          </span>
+                        )}
+                        <span className="text-emerald-300 font-bold text-xs truncate max-w-[180px]">
+                          {m.destino_funcao?.replace('[FORA DA UNIDADE]', '').replace('[INTERNO]', '').split('| Passageiros:')[0] || 'Serviço Geral'}
+                        </span>
                       </div>
-                      <div className="text-slate-400 text-[11px]">
+
+                      {((m as any).passageiros_trigramas || m.destino_funcao?.includes('Passageiros:')) && (
+                        <div className="pt-1 border-t border-slate-800 text-slate-300 text-[11px]">
+                          <span className="text-slate-400">👥 Passageiros: </span>
+                          <span className="font-bold text-cyan-300">
+                            {(m as any).passageiros_trigramas || m.destino_funcao?.split('Passageiros:')[1]}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="text-slate-400 text-[11px] pt-0.5">
                         Chaveiro Início: {m.localizacao_chave || 'Chaveiro 991'}
                       </div>
                       <div className="text-slate-500 text-[10px]">

@@ -66,6 +66,8 @@ export default function ChavePage() {
   const [kmInicialInput, setKmInicialInput] = useState<number>(initialV.km_atuais);
   const [isAtribuicaoModo, setIsAtribuicaoModo] = useState<boolean>(false);
   const [condutorQueEntrega, setCondutorQueEntrega] = useState<string>('');
+  const [foraDaUnidade, setForaDaUnidade] = useState<boolean>(false);
+  const [passageiros, setPassageiros] = useState<string>('');
 
   // Form states for Finalizar Marcha
   const [kmFinalInput, setKmFinalInput] = useState<number>(initialV.km_atuais);
@@ -315,14 +317,22 @@ export default function ChavePage() {
     saveMilitaryProfile(profileToSave);
     setErrorMsg('');
 
+    const passageirosStr = passageiros.trim();
+    const rawDestino = profile.destinoFuncao.trim();
+    const prefixServico = foraDaUnidade ? '[FORA DA UNIDADE]' : '[INTERNO]';
+    const passSuffix = passageirosStr ? ` | Passageiros: ${passageirosStr}` : '';
+    const destFormatted = `${prefixServico} ${rawDestino}${passSuffix}`;
+
     try {
       const newMarcha = {
         viatura_id: viatura.id,
         nip_inicio: nipVal,
         trigrama_ou_condutor_inicio: profile.trigramaOuCondutor,
-        destino_funcao: profile.destinoFuncao,
+        destino_funcao: destFormatted,
         km_inicial: kmInicialInput,
-        data_saida: new Date().toISOString()
+        data_saida: new Date().toISOString(),
+        fora_da_unidade: foraDaUnidade,
+        passageiros_trigramas: passageirosStr
       };
 
       let marchaRec: any = null;
@@ -332,9 +342,9 @@ export default function ChavePage() {
           let { data, error } = await supabase.from('registos_marcha').insert([newMarcha]).select();
 
           // Fallback if Supabase DB table has not run the column migration script yet
-          if (error && (error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
+          if (error && (error.message.includes('fora_da_unidade') || error.message.includes('passageiros') || error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
             console.warn('Aviso: Colunas de condutor/destino em falta no Supabase, a guardar payload base:', error.message);
-            const { trigrama_ou_condutor_inicio, destino_funcao, ...cleanPayload } = newMarcha;
+            const { fora_da_unidade, passageiros_trigramas, trigrama_ou_condutor_inicio, ...cleanPayload } = newMarcha;
             const retry = await supabase.from('registos_marcha').insert([cleanPayload]).select();
             data = retry.data;
           }
@@ -386,6 +396,14 @@ export default function ChavePage() {
     const now = new Date().toISOString();
     const currentKm = viatura.km_atuais || kmInicialInput;
 
+    const passageirosStr = passageiros.trim();
+    const rawDestino = (profile.destinoFuncao || marchaAtiva?.destino_funcao || 'Serviço Geral').trim();
+    const prefixServico = foraDaUnidade ? '[FORA DA UNIDADE]' : '[INTERNO]';
+    const passSuffix = passageirosStr && !rawDestino.includes('Passageiros:') ? ` | Passageiros: ${passageirosStr}` : '';
+    const destFormatted = rawDestino.includes('[FORA DA UNIDADE]') || rawDestino.includes('[INTERNO]')
+      ? `${rawDestino}${passSuffix}`
+      : `${prefixServico} ${rawDestino}${passSuffix}`;
+
     try {
       // 1. FECHO DA MARCHA ANTERIOR (Grava registo de devolução/entrega)
       if (marchaAtiva) {
@@ -422,9 +440,11 @@ export default function ChavePage() {
         viatura_id: viatura.id,
         nip_inicio: nipVal,
         trigrama_ou_condutor_inicio: profile.trigramaOuCondutor,
-        destino_funcao: profile.destinoFuncao || marchaAtiva?.destino_funcao || 'Serviço Geral',
+        destino_funcao: destFormatted,
         km_inicial: currentKm,
-        data_saida: now
+        data_saida: now,
+        fora_da_unidade: foraDaUnidade,
+        passageiros_trigramas: passageirosStr
       };
 
       let newMarchaRec: any = null;
@@ -433,8 +453,8 @@ export default function ChavePage() {
         try {
           let { data, error } = await supabase.from('registos_marcha').insert([newMarcha]).select();
 
-          if (error && (error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
-            const { trigrama_ou_condutor_inicio, destino_funcao, ...cleanPayload } = newMarcha;
+          if (error && (error.message.includes('fora_da_unidade') || error.message.includes('passageiros') || error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
+            const { fora_da_unidade, passageiros_trigramas, trigrama_ou_condutor_inicio, ...cleanPayload } = newMarcha;
             const retry = await supabase.from('registos_marcha').insert([cleanPayload]).select();
             data = retry.data;
           }
@@ -656,6 +676,16 @@ export default function ChavePage() {
                 </span>
               </div>
             </div>
+
+            {/* Passageiros e Âmbito */}
+            {((marchaAtiva as any)?.passageiros_trigramas || marchaAtiva?.destino_funcao?.includes('Passageiros:')) && (
+              <div className="pt-1.5 border-t border-blue-800/80 text-[11px] flex items-center space-x-2">
+                <span className="text-slate-400">👥 Passageiros / Acompanhantes:</span>
+                <span className="font-bold text-cyan-300">
+                  {(marchaAtiva as any)?.passageiros_trigramas || marchaAtiva?.destino_funcao?.split('Passageiros:')[1]}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -837,6 +867,37 @@ export default function ChavePage() {
               </div>
             </div>
 
+            {/* Âmbito da Deslocação (Interno vs Fora da Unidade) */}
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">
+                Âmbito da Deslocação / Tipo de Serviço *
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForaDaUnidade(false)}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold font-mono transition-all border ${
+                    !foraDaUnidade
+                      ? 'bg-emerald-950 text-emerald-300 border-emerald-500 shadow-md'
+                      : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                >
+                  🏢 Interno na Unidade (BA2 Ota)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForaDaUnidade(true)}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold font-mono transition-all border ${
+                    foraDaUnidade
+                      ? 'bg-amber-950 text-amber-300 border-amber-500 shadow-md'
+                      : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                >
+                  🛣️ Fora da Unidade (Serviço Externo)
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="block text-slate-400 mb-1 font-semibold">Destino / Função da Missão *</label>
               <input
@@ -844,7 +905,21 @@ export default function ChavePage() {
                 required
                 value={profile.destinoFuncao || ''}
                 onChange={(e) => setProfile({ ...profile, destinoFuncao: e.target.value })}
-                placeholder="Ex: BA1 Sintra / Apoio Tático"
+                placeholder={foraDaUnidade ? "Ex: BA1 Sintra / Missão Externa" : "Ex: Pista / Apoio Interno"}
+                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+              />
+            </div>
+
+            {/* Passageiros / Acompanhantes na Viatura */}
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">
+                Passageiros / Acompanhantes na Viatura (Trigramas ou Nomes)
+              </label>
+              <input
+                type="text"
+                value={passageiros}
+                onChange={(e) => setPassageiros(e.target.value)}
+                placeholder="Ex: FER, MNS ou Sargento Ferreira, Cabo Menezes (Opcional)"
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
               />
             </div>
@@ -936,7 +1011,52 @@ export default function ChavePage() {
                 required
                 value={profile.destinoFuncao || ''}
                 onChange={(e) => setProfile({ ...profile, destinoFuncao: e.target.value })}
-                placeholder="Ex: Pista / Serviço Geral"
+                placeholder={foraDaUnidade ? "Ex: BA1 Sintra / Missão Externa" : "Ex: Pista / Serviço Geral"}
+                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
+              />
+            </div>
+
+            {/* Âmbito da Deslocação (Interno vs Fora da Unidade) */}
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">
+                Âmbito da Deslocação / Tipo de Serviço *
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForaDaUnidade(false)}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold font-mono transition-all border ${
+                    !foraDaUnidade
+                      ? 'bg-emerald-950 text-emerald-300 border-emerald-500 shadow-md'
+                      : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                >
+                  🏢 Interno na Unidade
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForaDaUnidade(true)}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold font-mono transition-all border ${
+                    foraDaUnidade
+                      ? 'bg-amber-950 text-amber-300 border-amber-500 shadow-md'
+                      : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                >
+                  🛣️ Fora da Unidade (Serviço Externo)
+                </button>
+              </div>
+            </div>
+
+            {/* Passageiros / Acompanhantes na Viatura */}
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">
+                Passageiros / Acompanhantes na Viatura (Trigramas ou Nomes)
+              </label>
+              <input
+                type="text"
+                value={passageiros}
+                onChange={(e) => setPassageiros(e.target.value)}
+                placeholder="Ex: FER, MNS ou Sargento Ferreira, Cabo Menezes (Opcional)"
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono"
               />
             </div>
