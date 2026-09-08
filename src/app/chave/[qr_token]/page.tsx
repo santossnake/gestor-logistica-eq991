@@ -342,9 +342,9 @@ export default function ChavePage() {
           let { data, error } = await supabase.from('registos_marcha').insert([newMarcha]).select();
 
           // Fallback if Supabase DB table has not run the column migration script yet
-          if (error && (error.message.includes('fora_da_unidade') || error.message.includes('passageiros') || error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
-            console.warn('Aviso: Colunas de condutor/destino em falta no Supabase, a guardar payload base:', error.message);
-            const { fora_da_unidade, passageiros_trigramas, trigrama_ou_condutor_inicio, ...cleanPayload } = newMarcha;
+          if (error && (error.message.includes('fora_da_unidade') || error.message.includes('passageiros') || error.message.includes('destino_funcao'))) {
+            console.warn('Aviso: Colunas opcionais em falta no Supabase, a guardar payload base:', error.message);
+            const { fora_da_unidade, passageiros_trigramas, ...cleanPayload } = newMarcha;
             const retry = await supabase.from('registos_marcha').insert([cleanPayload]).select();
             data = retry.data;
           }
@@ -468,8 +468,8 @@ export default function ChavePage() {
         try {
           let { data, error } = await supabase.from('registos_marcha').insert([newMarcha]).select();
 
-          if (error && (error.message.includes('fora_da_unidade') || error.message.includes('passageiros') || error.message.includes('trigrama') || error.message.includes('destino_funcao'))) {
-            const { fora_da_unidade, passageiros_trigramas, trigrama_ou_condutor_inicio, ...cleanPayload } = newMarcha;
+          if (error && (error.message.includes('fora_da_unidade') || error.message.includes('passageiros') || error.message.includes('destino_funcao'))) {
+            const { fora_da_unidade, passageiros_trigramas, ...cleanPayload } = newMarcha;
             const retry = await supabase.from('registos_marcha').insert([cleanPayload]).select();
             data = retry.data;
           }

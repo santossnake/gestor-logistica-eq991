@@ -78,12 +78,26 @@ export default function RecomendadaPage() {
             } as any;
           }
 
-          // Verificar marcha ativa sem data de chegada
+          // Helper para validar se o valor é um condutor/trigrama real e ignorar "N/D"
+          const isValidoCondutor = (val?: string | null) => {
+            if (!val) return false;
+            const s = val.trim().toUpperCase();
+            return s !== '' && s !== 'N/D' && s !== 'ND' && s !== 'N/A' && s !== 'NULL' && s !== 'UNDEFINED';
+          };
+
+          // Verificar marcha ativa sem data de chegada por ID, matricula ou token
           const activeMarcha = mergedMarchas.find(
-            (m: any) => m.viatura_id === v.id && (!m.data_chegada || m.data_chegada === '')
+            (m: any) =>
+              (m.viatura_id === v.id || m.viatura_id === v.matricula || m.viatura_id === v.qr_code_token) &&
+              (!m.data_chegada || m.data_chegada === '')
           );
 
-          const condutorAtual = activeMarcha?.trigrama_ou_condutor_inicio || activeMarcha?.nip_inicio || (sanitized as any).condutor_atual || null;
+          const condutorAtual =
+            (isValidoCondutor(activeMarcha?.trigrama_ou_condutor_inicio) ? activeMarcha?.trigrama_ou_condutor_inicio : null) ||
+            (isValidoCondutor(sanitized.localizacao_atual_chave) && !sanitized.localizacao_atual_chave.includes('Chaveiro') && !sanitized.localizacao_atual_chave.includes('Telheiro') ? sanitized.localizacao_atual_chave : null) ||
+            (isValidoCondutor((sanitized as any).condutor_atual) ? (sanitized as any).condutor_atual : null) ||
+            (isValidoCondutor(activeMarcha?.nip_inicio) ? activeMarcha?.nip_inicio : null) ||
+            null;
 
           let estadoFinal = sanitized.estado;
           let localChaveFinal = sanitized.localizacao_atual_chave;

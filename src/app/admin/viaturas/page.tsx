@@ -180,10 +180,24 @@ export default function AdminViaturasPage() {
         const marchasList = (mData && mData.length > 0) ? mData : MOCK_MARCHAS;
         setMarchas(marchasList);
 
+        const isValidoCondutor = (val?: string | null) => {
+          if (!val) return false;
+          const s = val.trim().toUpperCase();
+          return s !== '' && s !== 'N/D' && s !== 'ND' && s !== 'N/A' && s !== 'NULL' && s !== 'UNDEFINED';
+        };
+
         const updatedFleet = sanitized.map((v) => {
-          const activeMarcha = marchasList.find((m) => m.viatura_id === v.id && !m.data_chegada);
+          const activeMarcha = marchasList.find(
+            (m) => (m.viatura_id === v.id || m.viatura_id === v.matricula || m.viatura_id === v.qr_code_token) && !m.data_chegada
+          );
           if (v.estado === 'EM_USO' || activeMarcha) {
-            const cond = activeMarcha?.trigrama_ou_condutor_inicio || activeMarcha?.nip_inicio;
+            const cond =
+              (isValidoCondutor(activeMarcha?.trigrama_ou_condutor_inicio) ? activeMarcha?.trigrama_ou_condutor_inicio : null) ||
+              (isValidoCondutor(v.localizacao_atual_chave) && !v.localizacao_atual_chave.includes('Chaveiro') && !v.localizacao_atual_chave.includes('Telheiro') ? v.localizacao_atual_chave : null) ||
+              (isValidoCondutor((v as any).condutor_atual) ? (v as any).condutor_atual : null) ||
+              (isValidoCondutor(activeMarcha?.nip_inicio) ? activeMarcha?.nip_inicio : null) ||
+              null;
+
             if (cond) {
               return { ...v, estado: 'EM_USO', localizacao_atual_chave: cond };
             }
