@@ -166,6 +166,7 @@ export default function RecomendadaPage() {
   }, []);
 
   const activeViatura = selectedViatura || recomendada;
+  const todasEmUso = viaturas.length > 0 && viaturas.every((v) => v.estado !== 'DISPONIVEL');
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 py-4">
@@ -198,6 +199,87 @@ export default function RecomendadaPage() {
       {showNfcScanner && (
         <div className="animate-in fade-in slide-in-from-top-4 duration-300">
           <NfcScanner />
+        </div>
+      )}
+
+      {/* BANNER E TABELA QUANDO TODAS AS VIATURAS ESTÃO EM USO */}
+      {todasEmUso && (
+        <div className="p-5 rounded-2xl bg-amber-950/80 border-2 border-amber-500/80 text-amber-100 space-y-4 shadow-2xl animate-in fade-in">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-amber-800/80 pb-3">
+            <div className="flex items-center space-x-2.5">
+              <ShieldAlert className="w-6 h-6 text-amber-400 animate-pulse flex-shrink-0" />
+              <div>
+                <h2 className="text-base font-black uppercase tracking-wider text-amber-200">
+                  ⚠️ Toda a Frota em Uso (0 Viaturas Disponíveis)
+                </h2>
+                <p className="text-xs text-amber-300/80 font-mono">
+                  Neste momento todas as viaturas da Esquadra 991 se encontram em serviço ou atribuídas.
+                </p>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-xs font-mono uppercase">
+              Frota Ocupada
+            </span>
+          </div>
+
+          {/* Tabela Resumida das Viaturas em Uso */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono border-collapse">
+              <thead>
+                <tr className="border-b border-amber-800 text-amber-300 uppercase text-[10px]">
+                  <th className="py-2 px-3">Viatura</th>
+                  <th className="py-2 px-3">Estado</th>
+                  <th className="py-2 px-3">Condutor / Responsável</th>
+                  <th className="py-2 px-3 text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-900/60">
+                {viaturas.map((v) => (
+                  <tr key={v.id} className="hover:bg-amber-900/40 transition-colors">
+                    <td className="py-2.5 px-3 font-bold text-white">
+                      <span className="text-emerald-400 font-mono text-sm">{v.matricula}</span>
+                      <span className="text-[11px] text-amber-300/70 block font-normal">{v.modelo}</span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          v.estado === 'EM_USO'
+                            ? 'bg-blue-950 text-blue-300 border border-blue-700'
+                            : v.estado === 'EMPRESTADA_EXTERNO'
+                            ? 'bg-purple-950 text-purple-300 border border-purple-700'
+                            : 'bg-amber-950 text-amber-300 border border-amber-700'
+                        }`}
+                      >
+                        {v.estado === 'EMPRESTADA_EXTERNO' ? 'CEDÊNCIA EXTERNA' : v.estado}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      {(v as any)._condutorAtual ? (
+                        <span className="font-black text-white bg-blue-600 px-2 py-0.5 rounded text-xs inline-block">
+                          👤 {(v as any)._condutorAtual}
+                        </span>
+                      ) : (v as any)._activeLoan ? (
+                        <span className="text-purple-200">
+                          🏢 {(v as any)._activeLoan.entidade_externa} ({(v as any)._activeLoan.nome_responsavel})
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-semibold">Sem registo ativo</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      <Link
+                        href={`/chave/${v.qr_code_token}`}
+                        className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] inline-flex items-center space-x-1 transition-colors"
+                      >
+                        <span>Abrir Chave</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
