@@ -29,8 +29,8 @@ import {
   LocateFixed
 } from 'lucide-react';
 import { getStoredMilitaryProfile, saveMilitaryProfile, saveFleetOverride, getFleetOverrides, getStoredLocais, getStoredMarchas, saveStoredMarchas, getStoredEmprestimos, MilitaryProfile } from '@/lib/utils/cookies';
-import { supabase, isSupabaseConfigured, Viatura, LocalItem, RegistoMarcha, EmprestimoExterno } from '@/lib/supabase/client';
-import { MOCK_VIATURAS, MOCK_LOCAIS, MOCK_MARCHAS } from '@/lib/mock-data';
+import { supabase, isSupabaseConfigured, Viatura, LocalItem, RegistoMarcha, EmprestimoExterno, Anomalia } from '@/lib/supabase/client';
+import { MOCK_VIATURAS, MOCK_LOCAIS, MOCK_MARCHAS, MOCK_ANOMALIAS } from '@/lib/mock-data';
 import { LiveGpsTracker } from '@/components/LiveGpsTracker';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
@@ -58,6 +58,7 @@ export default function ChavePage() {
   const [locaisChave, setLocaisChave] = useState<LocalItem[]>(MOCK_LOCAIS.filter((l) => l.tipo === 'CHAVE'));
   const [locaisViatura, setLocaisViatura] = useState<LocalItem[]>(MOCK_LOCAIS.filter((l) => l.tipo === 'VIATURA'));
   const [marchaAtiva, setMarchaAtiva] = useState<RegistoMarcha | null>(null);
+  const [anomaliasPendentes, setAnomaliasPendentes] = useState<Anomalia[]>([]);
 
   const [profile, setProfile] = useState<MilitaryProfile>({ nip: '', nome: '', posto: 'Tenente', email: '' });
   const [isGpsTrackingActive, setIsGpsTrackingActive] = useState<boolean>(false);
@@ -193,6 +194,21 @@ export default function ChavePage() {
           setActiveTab('FINALIZAR');
           setIsGpsTrackingActive(true);
         }
+
+        // Carregar anomalias/avarias não resolvidas para esta viatura
+        const { data: aData } = await supabase
+          .from('anomalias')
+          .select('*')
+          .eq('viatura_id', targetV.id)
+          .neq('estado_anomalia', 'RESOLVIDO')
+          .order('created_at', { ascending: false });
+
+        const localAnomalias = MOCK_ANOMALIAS.filter(
+          (a) => (a.viatura_id === targetV.id || a.viatura_id === targetV.matricula) && a.estado_anomalia !== 'RESOLVIDO'
+        );
+
+        const pendingAnomalias = (aData && aData.length > 0) ? aData : localAnomalias;
+        setAnomaliasPendentes(pendingAnomalias);
       } catch (err) {
         console.error('Carregamento assíncrono:', err);
       }
@@ -221,31 +237,26 @@ export default function ChavePage() {
     }
   };
 
-  // Handler: Save Refueling Record
-  const handleSaveRefuel = async (e: React.FormEvent) => {
+  // Handler: Save Refuel Data
+  const handleRefuel = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile.nip) {
-      alert('Por favor introduza o seu NIP.');
-      return;
-    }
+    if (!abastLitros) return;
 
     try {
-      const refuelRec = {
-        viatura_id: viatura.id,
-        registo_marcha_id: marchaAtiva?.id,
-        nip_responsavel: profile.nip,
-        tipo_abastecimento: tipoAbastecimento,
-        unidade_militar: tipoAbastecimento === 'UNIDADE_MILITAR' ? unidadeMilitar : null,
-        posto_comercial_nome: tipoAbastecimento === 'POSTO_COMERCIAL' ? postoComercialNome || 'Posto Comercial Externo' : null,
-        latitude_posto: abastGpsLat || viatura.latitude_atual || 39.094,
-        longitude_posto: abastGpsLng || viatura.longitude_atual || -8.967,
-        litros: abastLitros,
-        valor_euros: abastValor,
-        km_no_abastecimento: abastKm,
-        registado_at: new Date().toISOString()
-      };
-
-      await supabase.from('registos_abastecimento').insert([refuelRec]);
+      await supabase.from('abastecimentos').insert([
+        {
+          viatura_id: viatura.id,
+          registo_marcha_id: marchaAtiva?.id,
+          tipo_posto: tipoAbastecimento,
+          posto_nome: tipoAbastecimento === 'UNIDADE_MILITAR' ? unidadeMilitar : postoComercialNome || 'Posto Comercial',
+          litros: abastLitros,
+          valor_euros: abastValor,
+          km_viatura: abastKm,
+          latitude_abastecimento: abastGpsLat || viatura.latitude_atual || 39.094,
+          longitude_abastecimento: abastGpsLng || viatura.longitude_atual || -8.967,
+          registado_por: profile.trigramaOuCondutor || profile.nip || 'DESCONHECIDO'
+        }
+      ]);
 
       setRefuelSuccess(true);
       setTimeout(() => {
@@ -265,16 +276,25 @@ export default function ChavePage() {
     try {
       const fullDesc = `[${tipoAnomalia}] ${descricaoAnomalia}`;
 
-      await supabase.from('anomalias').insert([
+      const newAnomaliaRecord = {
+        viatura_id: viatura.id,
+        registo_marcha_id: marchaAtiva?.id,
+        descricao: fullDesc,
+        gravidade: gravidadeAnomalia,
+        latitude_incidente: viatura.latitude_atual || 39.094,
+        longitude_incidente: viatura.longitude_atual || -8.967,
+        estado_anomalia: 'PENDENTE'
+      };
+
+      await supabase.from('anomalias').insert([newAnomaliaRecord]);
+
+      setAnomaliasPendentes((prev) => [
         {
-          viatura_id: viatura.id,
-          registo_marcha_id: marchaAtiva?.id,
-          descricao: fullDesc,
-          gravidade: gravidadeAnomalia,
-          latitude_incidente: viatura.latitude_atual || 39.094,
-          longitude_incidente: viatura.longitude_atual || -8.967,
-          estado_anomalia: 'PENDENTE'
-        }
+          id: `anom-${Date.now()}`,
+          created_at: new Date().toISOString(),
+          ...newAnomaliaRecord
+        } as any,
+        ...prev
       ]);
 
       if (gravidadeAnomalia === 'GRAVE') {
@@ -725,6 +745,55 @@ export default function ChavePage() {
                 </span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* UNRESOLVED ANOMALIES / ISSUES CARD */}
+        {anomaliasPendentes.length > 0 && (
+          <div className="p-4 rounded-xl bg-rose-950/90 border-2 border-rose-500/70 text-rose-100 space-y-3 shadow-xl animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-rose-800/80 pb-2">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-5 h-5 text-rose-400 animate-pulse flex-shrink-0" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-rose-200 font-mono">
+                  ⚠️ Problemas Reportados Não Resolvidos ({anomaliasPendentes.length})
+                </h3>
+              </div>
+              <span className="px-2 py-0.5 rounded bg-rose-900 text-rose-300 text-[10px] font-mono font-bold">
+                Atenção Condutor
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {anomaliasPendentes.map((anom) => (
+                <div
+                  key={anom.id}
+                  className="p-3 rounded-lg bg-slate-900/90 border border-rose-900/60 text-xs font-mono flex items-start justify-between gap-2"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          anom.gravidade === 'GRAVE'
+                            ? 'bg-rose-600 text-white font-black'
+                            : anom.gravidade === 'MODERADA'
+                            ? 'bg-amber-600 text-white font-bold'
+                            : 'bg-slate-700 text-slate-200'
+                        }`}
+                      >
+                        {anom.gravidade}
+                      </span>
+                      <span className="text-slate-400 text-[10px]">
+                        {anom.created_at ? new Date(anom.created_at).toLocaleString('pt-PT') : 'Registo recente'}
+                      </span>
+                    </div>
+                    <p className="text-slate-100 font-semibold">{anom.descricao}</p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold whitespace-nowrap">
+                    {anom.estado_anomalia || 'PENDENTE'}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1304,7 +1373,7 @@ export default function ChavePage() {
                 <p className="text-xs text-emerald-300">Os litros e odómetro foram atualizados na Logística.</p>
               </div>
             ) : (
-              <form onSubmit={handleSaveRefuel} className="space-y-4 text-xs">
+              <form onSubmit={handleRefuel} className="space-y-4 text-xs">
                 {/* Refuel Type Tabs */}
                 <div>
                   <label className="block text-slate-400 mb-1 font-semibold">Tipo de Abastecimento *</label>
