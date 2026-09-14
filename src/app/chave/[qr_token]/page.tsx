@@ -69,6 +69,8 @@ export default function ChavePage() {
   const [condutorQueEntrega, setCondutorQueEntrega] = useState<string>('');
   const [foraDaUnidade, setForaDaUnidade] = useState<boolean>(false);
   const [passageiros, setPassageiros] = useState<string>('');
+  const [todasMarchasAtivas, setTodasMarchasAtivas] = useState<any[]>([]);
+  const [confirmarMultiplasViaturas, setConfirmarMultiplasViaturas] = useState<boolean>(false);
 
   // Form states for Finalizar Marcha
   const [kmFinalInput, setKmFinalInput] = useState<number>(initialV.km_atuais);
@@ -178,16 +180,25 @@ export default function ChavePage() {
           } as any);
         }
 
-        const { data: mData } = await supabase
+        // Carregar todas as marchas ativas na frota para detetar se o condutor já tem outra viatura em uso
+        const { data: allActiveM } = await supabase
           .from('registos_marcha')
           .select('*')
-          .eq('viatura_id', targetV.id)
-          .is('data_chegada', null)
-          .order('data_saida', { ascending: false })
-          .limit(1);
+          .is('data_chegada', null);
 
-        if (mData && mData.length > 0) {
-          setMarchaAtiva(mData[0]);
+        const localMarchasAtivas = getStoredMarchas().filter((m: any) => !m.data_chegada);
+        const mapActive = new Map<string, any>();
+        (allActiveM || []).forEach((m) => mapActive.set(m.id, m));
+        localMarchasAtivas.forEach((m: any) => { if (!mapActive.has(m.id)) mapActive.set(m.id, m); });
+        const mergedActive = Array.from(mapActive.values());
+        setTodasMarchasAtivas(mergedActive);
+
+        const activeForThisVtr = mergedActive.find(
+          (m: any) => (m.viatura_id === targetV.id || m.viatura_id === targetV.matricula || m.viatura_id === targetV.qr_code_token)
+        );
+
+        if (activeForThisVtr) {
+          setMarchaAtiva(activeForThisVtr);
           setActiveTab('FINALIZAR');
           setIsGpsTrackingActive(true);
         } else if (targetV.estado === 'EM_USO') {
@@ -218,6 +229,28 @@ export default function ChavePage() {
       loadData();
     }
   }, [qrToken]);
+
+  // Helper para verificar se o militar (trigrama ou NIP) já tem outra viatura ativa em seu nome
+  const getOutraViaturaEmUso = (trigramaOuNome?: string, nip?: string) => {
+    if (!trigramaOuNome && !nip) return null;
+    const tClean = (trigramaOuNome || '').trim().toLowerCase();
+    const nipClean = (nip || '').trim();
+
+    if (!tClean || tClean === 'n/d' || tClean === 'nd') return null;
+
+    return todasMarchasAtivas.find((m: any) => {
+      // Ignorar a viatura atual
+      if (m.viatura_id === viatura.id || m.viatura_id === viatura.matricula || m.viatura_id === viatura.qr_code_token) return false;
+
+      const mTrig = (m.trigrama_ou_condutor_inicio || '').trim().toLowerCase();
+      const mNip = (m.nip_inicio || '').trim();
+
+      if (tClean && mTrig === tClean) return true;
+      if (nipClean && nipClean !== 'N/D' && nipClean !== 'n/d' && mNip === nipClean) return true;
+
+      return false;
+    });
+  };
 
   // Capture GPS location for Refueling Station
   const handleCaptureGpsLocation = () => {
@@ -332,6 +365,13 @@ export default function ChavePage() {
       return;
     }
 
+    const outraMarcha = getOutraViaturaEmUso(profile.trigramaOuCondutor, profile.nip);
+    if (outraMarcha && !confirmarMultiplasViaturas) {
+      const vOutraMat = MOCK_VIATURAS.find((v) => v.id === outraMarcha.viatura_id || v.matricula === outraMarcha.viatura_id)?.matricula || outraMarcha.viatura_id;
+      setErrorMsg(`⚠️ Atenção: Já tem a viatura ${vOutraMat} atribuída em seu nome. Se pretender realmente assumir esta viatura adicional, por favor marque a caixa de seleção de confirmação.`);
+      return;
+    }
+
     const nipVal = profile.nip && profile.nip.trim() ? profile.nip.trim() : 'N/D';
     const profileToSave = { ...profile, nip: nipVal };
     saveMilitaryProfile(profileToSave);
@@ -424,6 +464,14 @@ export default function ChavePage() {
       setErrorMsg('Por favor introduza o Trigrama / Posto e Nome do novo condutor.');
       return;
     }
+
+    const outraMarcha = getOutraViaturaEmUso(profile.trigramaOuCondutor, profile.nip);
+    if (outraMarcha && !confirmarMultiplasViaturas) {
+      const vOutraMat = MOCK_VIATURAS.find((v) => v.id === outraMarcha.viatura_id || v.matricula === outraMarcha.viatura_id)?.matricula || outraMarcha.viatura_id;
+      setErrorMsg(`⚠️ Atenção: O militar ${profile.trigramaOuCondutor} já tem a viatura ${vOutraMat} atribuída. Se pretender realmente assumir esta viatura adicional, por favor marque a caixa de seleção de confirmação.`);
+      return;
+    }
+
     const nipVal = profile.nip && profile.nip.trim() ? profile.nip.trim() : 'N/D';
     saveMilitaryProfile({ ...profile, nip: nipVal });
     setErrorMsg('');
@@ -975,6 +1023,41 @@ export default function ChavePage() {
               </div>
             </div>
 
+            {/* AVISO & CHECKBOX: VIATURA JÁ ATRIBUÍDA */}
+            {(() => {
+              const outraMarcha = getOutraViaturaEmUso(profile.trigramaOuCondutor, profile.nip);
+              if (!outraMarcha) return null;
+
+              const vOutraMat = MOCK_VIATURAS.find((v) => v.id === outraMarcha.viatura_id || v.matricula === outraMarcha.viatura_id)?.matricula || outraMarcha.viatura_id;
+
+              return (
+                <div className="p-4 rounded-xl bg-amber-950/90 border-2 border-amber-500/80 text-amber-100 text-xs font-mono space-y-3 shadow-xl animate-in fade-in">
+                  <div className="flex items-center space-x-2 border-b border-amber-800/80 pb-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-400 animate-pulse flex-shrink-0" />
+                    <span className="font-black uppercase tracking-wider text-amber-200 text-xs">
+                      ⚠️ AVISO: VIATURA JÁ ATRIBUÍDA A ESTE MILITAR
+                    </span>
+                  </div>
+
+                  <p className="text-amber-200 font-semibold leading-relaxed">
+                    O militar <strong className="text-white bg-amber-900 px-1.5 py-0.5 rounded">{profile.trigramaOuCondutor}</strong> já se encontra registado como condutor ativo da viatura <strong className="text-emerald-300 bg-amber-900 px-1.5 py-0.5 rounded">{vOutraMat}</strong>.
+                  </p>
+
+                  <label className="flex items-start space-x-3 cursor-pointer bg-slate-900/90 p-3 rounded-lg border border-amber-500/60 hover:border-amber-400 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={confirmarMultiplasViaturas}
+                      onChange={(e) => setConfirmarMultiplasViaturas(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-amber-500 text-amber-500 focus:ring-amber-500 accent-amber-500 cursor-pointer"
+                    />
+                    <span className="text-slate-200 text-xs font-bold leading-tight">
+                      Compreendo que já tenho a viatura <span className="text-amber-300">{vOutraMat}</span> atribuída em meu nome, mas confirmo que pretendo assumir esta viatura adicional.
+                    </span>
+                  </label>
+                </div>
+              );
+            })()}
+
             {/* Âmbito da Deslocação (Interno vs Fora da Unidade) */}
             <div>
               <label className="block text-slate-400 mb-1 font-semibold">
@@ -1111,6 +1194,41 @@ export default function ChavePage() {
                 />
               </div>
             </div>
+
+            {/* AVISO & CHECKBOX: VIATURA JÁ ATRIBUÍDA (ALTERNAR) */}
+            {(() => {
+              const outraMarcha = getOutraViaturaEmUso(profile.trigramaOuCondutor, profile.nip);
+              if (!outraMarcha) return null;
+
+              const vOutraMat = MOCK_VIATURAS.find((v) => v.id === outraMarcha.viatura_id || v.matricula === outraMarcha.viatura_id)?.matricula || outraMarcha.viatura_id;
+
+              return (
+                <div className="p-4 rounded-xl bg-amber-950/90 border-2 border-amber-500/80 text-amber-100 text-xs font-mono space-y-3 shadow-xl animate-in fade-in">
+                  <div className="flex items-center space-x-2 border-b border-amber-800/80 pb-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-400 animate-pulse flex-shrink-0" />
+                    <span className="font-black uppercase tracking-wider text-amber-200 text-xs">
+                      ⚠️ AVISO: VIATURA JÁ ATRIBUÍDA A ESTE MILITAR
+                    </span>
+                  </div>
+
+                  <p className="text-amber-200 font-semibold leading-relaxed">
+                    O militar <strong className="text-white bg-amber-900 px-1.5 py-0.5 rounded">{profile.trigramaOuCondutor}</strong> já se encontra registado como condutor ativo da viatura <strong className="text-emerald-300 bg-amber-900 px-1.5 py-0.5 rounded">{vOutraMat}</strong>.
+                  </p>
+
+                  <label className="flex items-start space-x-3 cursor-pointer bg-slate-900/90 p-3 rounded-lg border border-amber-500/60 hover:border-amber-400 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={confirmarMultiplasViaturas}
+                      onChange={(e) => setConfirmarMultiplasViaturas(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-amber-500 text-amber-500 focus:ring-amber-500 accent-amber-500 cursor-pointer"
+                    />
+                    <span className="text-slate-200 text-xs font-bold leading-tight">
+                      Compreendo que já tenho a viatura <span className="text-amber-300">{vOutraMat}</span> atribuída em meu nome, mas confirmo que pretendo assumir esta viatura adicional.
+                    </span>
+                  </label>
+                </div>
+              );
+            })()}
 
             <div>
               <label className="block text-slate-400 mb-1 font-semibold">Novo Destino / Função *</label>
