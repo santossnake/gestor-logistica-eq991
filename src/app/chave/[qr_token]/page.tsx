@@ -760,7 +760,7 @@ export default function ChavePage() {
 
       setIsGpsTrackingActive(false);
       setShowConfirmCloseModal(false);
-      setShowCloseSuccessModal(true);
+      router.push('/recomendada');
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao finalizar a marcha.');
     }
@@ -941,24 +941,7 @@ export default function ChavePage() {
         </div>
       </div>
 
-      {/* Map of Last Vehicle Location */}
-      <div className="p-4 rounded-xl glass-panel border border-slate-800 space-y-2">
-        <div className="flex items-center space-x-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
-          <MapPin className="w-4 h-4 text-emerald-400" />
-          <span>Última Localização GPS Conhecida da Viatura (Ota: 39.094, -8.967)</span>
-        </div>
-        <div className="h-56 rounded-lg overflow-hidden border border-slate-800">
-          <MapView viaturas={[viatura]} />
-        </div>
-      </div>
 
-      {/* GPS Live Tracker Banner */}
-      <LiveGpsTracker
-        viaturaId={viatura.id}
-        registoMarchaId={marchaAtiva?.id}
-        nipOperador={profile.nip}
-        isActive={isGpsTrackingActive}
-      />
 
       {errorMsg && (
         <div className="p-3 rounded-lg bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs flex items-center space-x-2">
@@ -1786,27 +1769,22 @@ export default function ChavePage() {
       {/* MODAL: CONFIRMAÇÃO DE DEVOLUÇÃO E LOCAIS DA MARCHA */}
       {showConfirmCloseModal && pendingCloseLocations && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full glass-panel p-6 rounded-2xl border-2 border-amber-500/70 space-y-5 shadow-2xl animate-in zoom-in-95">
-            <div className="flex items-center space-x-3 text-amber-400 border-b border-amber-500/30 pb-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0">
-                <AlertTriangle className="w-6 h-6 animate-pulse" />
-              </div>
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-wider text-amber-300">
-                  ⚠️ CONFIRMAÇÃO DE DEVOLUÇÃO
-                </h3>
-                <p className="text-[11px] text-slate-300 font-mono">
-                  Verifique os locais escolhidos para entregar a chave e a viatura
-                </p>
-              </div>
+          <div className="max-w-md w-full glass-panel p-6 rounded-2xl border-2 border-emerald-500/50 space-y-5 text-center shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 mx-auto">
+              <CheckCircle2 className="w-8 h-8" />
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-900 border-2 border-amber-500/40 space-y-3 font-mono text-xs">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span className="text-slate-400 text-[10px] uppercase font-bold">Viatura / Matrícula</span>
-                <span className="text-white font-black text-sm tracking-widest">{viatura.matricula}</span>
-              </div>
+            <div className="space-y-1">
+              <h2 className="text-xl font-black text-white uppercase tracking-wider">
+                CONFIRMAÇÃO DE DEVOLUÇÃO
+              </h2>
+              <p className="text-xs text-slate-300">
+                A viatura <span className="font-mono font-bold text-emerald-400">{viatura.matricula}</span> vai ser devolvida com os seguintes locais:
+              </p>
+            </div>
 
+            {/* Confirmed Locations Card */}
+            <div className="p-4 rounded-xl bg-slate-900 border-2 border-emerald-500/40 text-left font-mono text-xs space-y-3">
               <div className="space-y-2">
                 <div className="p-2.5 rounded-lg bg-slate-950 border border-amber-500/40">
                   <span className="text-slate-400 text-[10px] block font-bold uppercase text-amber-400">
@@ -1839,61 +1817,6 @@ export default function ChavePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <button
-                type="button"
-                onClick={() => setShowConfirmCloseModal(false)}
-                className="py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider transition-colors border border-slate-700"
-              >
-                ✏️ Alterar Locais
-              </button>
-
-              <button
-                type="button"
-                onClick={handleFinalizarMarcha}
-                className="py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-950 transition-colors flex items-center justify-center space-x-1"
-              >
-                <span>✅ Confirmar & Fechar</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* POST-CLOSING SUCCESS MODAL */}
-      {showCloseSuccessModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full glass-panel p-6 rounded-2xl border-2 border-emerald-500/50 space-y-5 text-center shadow-2xl animate-in zoom-in-95">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 mx-auto">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-xl font-black text-white uppercase tracking-wider">
-                Marcha Concluída com Sucesso
-              </h2>
-              <p className="text-xs text-slate-300">
-                A viatura <span className="font-mono font-bold text-emerald-400">{viatura.matricula}</span> foi devolvida.
-              </p>
-            </div>
-
-            {/* Confirmed Locations Card */}
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-left text-xs font-mono space-y-2">
-              <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider border-b border-slate-800 pb-1">
-                📍 LOCAIS REGISTADOS NA DEVOLUÇÃO
-              </div>
-              <div className="space-y-1.5 text-xs">
-                <div>
-                  <span className="text-slate-400 text-[10px] block font-mono">LOCAL DA CHAVE / CHAVEIRO</span>
-                  <span className="font-bold text-amber-300 text-sm block">{viatura.localizacao_atual_chave}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] block font-mono">ESTACIONAMENTO DA VIATURA</span>
-                  <span className="font-bold text-emerald-300 text-sm block">{viatura.localizacao_atual_viatura}</span>
-                </div>
-              </div>
-            </div>
-
             <div className="p-3.5 rounded-xl bg-amber-950/80 border-2 border-amber-500/60 text-amber-200 text-xs space-y-1 text-left">
               <div className="flex items-center space-x-2 font-bold uppercase tracking-wider text-amber-300">
                 <Briefcase className="w-4 h-4" />
@@ -1904,15 +1827,23 @@ export default function ChavePage() {
               </p>
             </div>
 
-            <button
-              onClick={() => {
-                setShowCloseSuccessModal(false);
-                router.push('/recomendada');
-              }}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm uppercase tracking-wider transition-colors shadow-lg shadow-emerald-950"
-            >
-              Concluir & Voltar
-            </button>
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowConfirmCloseModal(false)}
+                className="py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider transition-colors border border-slate-700"
+              >
+                ↩️ Voltar para Corrigir
+              </button>
+
+              <button
+                type="button"
+                onClick={handleFinalizarMarcha}
+                className="py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-950 transition-colors flex items-center justify-center space-x-1"
+              >
+                <span>Concluir</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
