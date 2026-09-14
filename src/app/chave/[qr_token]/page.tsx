@@ -198,17 +198,17 @@ export default function ChavePage() {
         const mergedActive = Array.from(mapActive.values());
         setTodasMarchasAtivas(mergedActive);
 
-        const activeForThisVtr = mergedActive.find(
-          (m: any) => (m.viatura_id === targetV.id || m.viatura_id === targetV.matricula || m.viatura_id === targetV.qr_code_token)
-        );
-
-        if (activeForThisVtr) {
-          setMarchaAtiva(activeForThisVtr);
+        if (targetV.estado === 'EM_USO') {
+          const activeForThisVtr = mergedActive.find(
+            (m: any) => (m.viatura_id === targetV.id || m.viatura_id === targetV.matricula || m.viatura_id === targetV.qr_code_token)
+          );
+          if (activeForThisVtr) setMarchaAtiva(activeForThisVtr);
           setActiveTab('FINALIZAR');
           setIsGpsTrackingActive(true);
-        } else if (targetV.estado === 'EM_USO') {
-          setActiveTab('FINALIZAR');
-          setIsGpsTrackingActive(true);
+        } else {
+          setMarchaAtiva(null);
+          setActiveTab('INICIAR');
+          setIsGpsTrackingActive(false);
         }
 
         // Carregar anomalias/avarias não resolvidas para esta viatura
@@ -245,26 +245,49 @@ export default function ChavePage() {
     return vId;
   };
 
-  // Helper para verificar se o militar (trigrama ou NIP) já tem outra(s) viatura(s) ativa(s) em seu nome
-  const getOutrasMarchasEmUso = (trigramaOuNome?: string, nip?: string) => {
+  // Helper para obter todas as matrículas das viaturas ativas em uso por um militar (trigrama ou NIP)
+  const getMatriculasEmUsoPeloMilitar = (trigramaOuNome?: string, nip?: string): string[] => {
     if (!trigramaOuNome && !nip) return [];
     const tClean = (trigramaOuNome || '').trim().toLowerCase();
     const nipClean = (nip || '').trim();
 
     if (!tClean || tClean === 'n/d' || tClean === 'nd') return [];
 
-    return todasMarchasAtivas.filter((m: any) => {
-      // Ignorar a viatura atual
-      if (m.viatura_id === viatura.id || m.viatura_id === viatura.matricula || m.viatura_id === viatura.qr_code_token) return false;
+    const matriculasSet = new Set<string>();
+
+    // 1. Procurar em todasViaturas que estejam 'EM_USO' (excluindo a viatura atual desta página)
+    todasViaturas.forEach((v) => {
+      if (v.id === viatura.id || v.matricula === viatura.matricula || v.qr_code_token === viatura.qr_code_token) return;
+
+      if (v.estado === 'EM_USO') {
+        const vLocChave = (v.localizacao_atual_chave || '').trim().toLowerCase();
+        if (tClean && (vLocChave === tClean || vLocChave.includes(tClean))) {
+          matriculasSet.add(v.matricula);
+        }
+      }
+    });
+
+    // 2. Procurar em todasMarchasAtivas (registos sem data_chegada onde a viatura correspondente esteja EM_USO)
+    todasMarchasAtivas.forEach((m) => {
+      if (m.viatura_id === viatura.id || m.viatura_id === viatura.matricula || m.viatura_id === viatura.qr_code_token) return;
 
       const mTrig = (m.trigrama_ou_condutor_inicio || '').trim().toLowerCase();
       const mNip = (m.nip_inicio || '').trim();
 
-      if (tClean && mTrig === tClean) return true;
-      if (nipClean && nipClean !== 'N/D' && nipClean !== 'n/d' && mNip === nipClean) return true;
+      const isMatch = (tClean && mTrig === tClean) || (nipClean && nipClean !== 'N/D' && nipClean !== 'n/d' && mNip === nipClean);
 
-      return false;
+      if (isMatch) {
+        const v = todasViaturas.find((v) => v.id === m.viatura_id || v.matricula === m.viatura_id || v.qr_code_token === m.viatura_id);
+        if (!v || v.estado === 'EM_USO') {
+          const mat = getMatriculaViatura(m.viatura_id);
+          if (mat && mat !== viatura.matricula) {
+            matriculasSet.add(mat);
+          }
+        }
+      }
     });
+
+    return Array.from(matriculasSet);
   };
 
   // Capture GPS location for Refueling Station
@@ -380,11 +403,11 @@ export default function ChavePage() {
       return;
     }
 
-    const outrasMarchas = getOutrasMarchasEmUso(profile.trigramaOuCondutor, profile.nip);
-    if (outrasMarchas.length > 0 && !confirmarMultiplasViaturas) {
-      const matriculasSet = new Set(outrasMarchas.map((m: any) => getMatriculaViatura(m.viatura_id)));
-      const matriculasStr = Array.from(matriculasSet).join(', ');
-      setErrorMsg(`⚠️ Atenção: Já tem a(s) viatura(s) ${matriculasStr} atribuída(s) em seu nome. Se pretender realmente assumir esta viatura adicional, por favor marque a caixa de seleção de confirmação.`);
+    const matriculasEmUso = getMatriculasEmUsoPeloMilitar(profile.trigramaOuCondutor, profile.nip);
+    if (matriculasEmUso.length > 0 && !confirmarMultiplasViaturas) {
+      const matriculasStr = matriculasEmUso.join(', ');
+      const plural = matriculasEmUso.length > 1;
+      setErrorMsg(`⚠️ Atenção: Já tem ${plural ? 'as viaturas' : 'a viatura'} ${matriculasStr} atribuída${plural ? 's' : ''} em seu nome. Se pretender realmente assumir esta viatura adicional, por favor marque a caixa de seleção de confirmação.`);
       return;
     }
 
@@ -481,11 +504,11 @@ export default function ChavePage() {
       return;
     }
 
-    const outrasMarchas = getOutrasMarchasEmUso(profile.trigramaOuCondutor, profile.nip);
-    if (outrasMarchas.length > 0 && !confirmarMultiplasViaturas) {
-      const matriculasSet = new Set(outrasMarchas.map((m: any) => getMatriculaViatura(m.viatura_id)));
-      const matriculasStr = Array.from(matriculasSet).join(', ');
-      setErrorMsg(`⚠️ Atenção: O militar ${profile.trigramaOuCondutor} já tem a(s) viatura(s) ${matriculasStr} atribuída(s). Se pretender realmente assumir esta viatura adicional, por favor marque a caixa de seleção de confirmação.`);
+    const matriculasEmUso = getMatriculasEmUsoPeloMilitar(profile.trigramaOuCondutor, profile.nip);
+    if (matriculasEmUso.length > 0 && !confirmarMultiplasViaturas) {
+      const matriculasStr = matriculasEmUso.join(', ');
+      const plural = matriculasEmUso.length > 1;
+      setErrorMsg(`⚠️ Atenção: O militar ${profile.trigramaOuCondutor} já tem ${plural ? 'as viaturas' : 'a viatura'} ${matriculasStr} atribuída${plural ? 's' : ''}. Se pretender realmente assumir esta viatura adicional, por favor marque a caixa de seleção de confirmação.`);
       return;
     }
 
@@ -774,7 +797,7 @@ export default function ChavePage() {
         )}
 
         {/* Active Marcha Driver & Destination Card */}
-        {(viatura.estado === 'EM_USO' || marchaAtiva) && (
+        {viatura.estado === 'EM_USO' && (
           <div className="p-3.5 rounded-xl bg-blue-950/90 border border-blue-500/60 text-blue-200 text-xs font-mono space-y-2 shadow-lg animate-in fade-in">
             <div className="flex items-center justify-between font-bold text-blue-300 border-b border-blue-800/80 pb-1.5">
               <span className="flex items-center space-x-1.5 uppercase tracking-wider">
@@ -1042,23 +1065,23 @@ export default function ChavePage() {
 
             {/* AVISO & CHECKBOX: VIATURA JÁ ATRIBUÍDA */}
             {(() => {
-              const outrasMarchas = getOutrasMarchasEmUso(profile.trigramaOuCondutor, profile.nip);
-              if (outrasMarchas.length === 0) return null;
+              const matriculasEmUso = getMatriculasEmUsoPeloMilitar(profile.trigramaOuCondutor, profile.nip);
+              if (matriculasEmUso.length === 0) return null;
 
-              const matriculasSet = new Set(outrasMarchas.map((m: any) => getMatriculaViatura(m.viatura_id)));
-              const matriculasStr = Array.from(matriculasSet).join(', ');
+              const matriculasStr = matriculasEmUso.join(', ');
+              const plural = matriculasEmUso.length > 1;
 
               return (
                 <div className="p-4 rounded-xl bg-amber-950/90 border-2 border-amber-500/80 text-amber-100 text-xs font-mono space-y-3 shadow-xl animate-in fade-in">
                   <div className="flex items-center space-x-2 border-b border-amber-800/80 pb-2">
                     <AlertTriangle className="w-5 h-5 text-amber-400 animate-pulse flex-shrink-0" />
                     <span className="font-black uppercase tracking-wider text-amber-200 text-xs">
-                      ⚠️ AVISO: VIATURA(S) JÁ ATRIBUÍDA(S) A ESTE MILITAR
+                      ⚠️ AVISO: VIATURA{plural ? 'S' : ''} JÁ ATRIBUÍDA{plural ? 'S' : ''} A ESTE MILITAR
                     </span>
                   </div>
 
                   <p className="text-amber-200 font-semibold leading-relaxed">
-                    O militar <strong className="text-white bg-amber-900 px-1.5 py-0.5 rounded">{profile.trigramaOuCondutor}</strong> já se encontra registado como condutor ativo da(s) viatura(s) <strong className="text-emerald-300 bg-amber-900 px-1.5 py-0.5 rounded">{matriculasStr}</strong>.
+                    O militar <strong className="text-white bg-amber-900 px-1.5 py-0.5 rounded">{profile.trigramaOuCondutor}</strong> já se encontra registado como condutor ativo {plural ? 'das viaturas' : 'da viatura'} <strong className="text-emerald-300 bg-amber-900 px-1.5 py-0.5 rounded">{matriculasStr}</strong>.
                   </p>
 
                   <label className="flex items-start space-x-3 cursor-pointer bg-slate-900/90 p-3 rounded-lg border border-amber-500/60 hover:border-amber-400 transition-colors">
@@ -1069,7 +1092,7 @@ export default function ChavePage() {
                       className="mt-0.5 w-4 h-4 rounded border-amber-500 text-amber-500 focus:ring-amber-500 accent-amber-500 cursor-pointer"
                     />
                     <span className="text-slate-200 text-xs font-bold leading-tight">
-                      Compreendo que já tenho a(s) viatura(s) <span className="text-amber-300">{matriculasStr}</span> atribuída(s) em meu nome, mas confirmo que pretendo assumir esta viatura adicional.
+                      Compreendo que já tenho {plural ? 'as viaturas' : 'a viatura'} <span className="text-amber-300">{matriculasStr}</span> atribuída{plural ? 's' : ''} em meu nome, mas confirmo que pretendo assumir esta viatura adicional.
                     </span>
                   </label>
                 </div>
@@ -1215,23 +1238,23 @@ export default function ChavePage() {
 
             {/* AVISO & CHECKBOX: VIATURA JÁ ATRIBUÍDA (ALTERNAR) */}
             {(() => {
-              const outrasMarchas = getOutrasMarchasEmUso(profile.trigramaOuCondutor, profile.nip);
-              if (outrasMarchas.length === 0) return null;
+              const matriculasEmUso = getMatriculasEmUsoPeloMilitar(profile.trigramaOuCondutor, profile.nip);
+              if (matriculasEmUso.length === 0) return null;
 
-              const matriculasSet = new Set(outrasMarchas.map((m: any) => getMatriculaViatura(m.viatura_id)));
-              const matriculasStr = Array.from(matriculasSet).join(', ');
+              const matriculasStr = matriculasEmUso.join(', ');
+              const plural = matriculasEmUso.length > 1;
 
               return (
                 <div className="p-4 rounded-xl bg-amber-950/90 border-2 border-amber-500/80 text-amber-100 text-xs font-mono space-y-3 shadow-xl animate-in fade-in">
                   <div className="flex items-center space-x-2 border-b border-amber-800/80 pb-2">
                     <AlertTriangle className="w-5 h-5 text-amber-400 animate-pulse flex-shrink-0" />
                     <span className="font-black uppercase tracking-wider text-amber-200 text-xs">
-                      ⚠️ AVISO: VIATURA(S) JÁ ATRIBUÍDA(S) A ESTE MILITAR
+                      ⚠️ AVISO: VIATURA{plural ? 'S' : ''} JÁ ATRIBUÍDA{plural ? 'S' : ''} A ESTE MILITAR
                     </span>
                   </div>
 
                   <p className="text-amber-200 font-semibold leading-relaxed">
-                    O militar <strong className="text-white bg-amber-900 px-1.5 py-0.5 rounded">{profile.trigramaOuCondutor}</strong> já se encontra registado como condutor ativo da(s) viatura(s) <strong className="text-emerald-300 bg-amber-900 px-1.5 py-0.5 rounded">{matriculasStr}</strong>.
+                    O militar <strong className="text-white bg-amber-900 px-1.5 py-0.5 rounded">{profile.trigramaOuCondutor}</strong> já se encontra registado como condutor ativo {plural ? 'das viaturas' : 'da viatura'} <strong className="text-emerald-300 bg-amber-900 px-1.5 py-0.5 rounded">{matriculasStr}</strong>.
                   </p>
 
                   <label className="flex items-start space-x-3 cursor-pointer bg-slate-900/90 p-3 rounded-lg border border-amber-500/60 hover:border-amber-400 transition-colors">
@@ -1242,7 +1265,7 @@ export default function ChavePage() {
                       className="mt-0.5 w-4 h-4 rounded border-amber-500 text-amber-500 focus:ring-amber-500 accent-amber-500 cursor-pointer"
                     />
                     <span className="text-slate-200 text-xs font-bold leading-tight">
-                      Compreendo que já tenho a(s) viatura(s) <span className="text-amber-300">{matriculasStr}</span> atribuída(s) em meu nome, mas confirmo que pretendo assumir esta viatura adicional.
+                      Compreendo que já tenho {plural ? 'as viaturas' : 'a viatura'} <span className="text-amber-300">{matriculasStr}</span> atribuída{plural ? 's' : ''} em meu nome, mas confirmo que pretendo assumir esta viatura adicional.
                     </span>
                   </label>
                 </div>
